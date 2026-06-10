@@ -2,6 +2,9 @@
   "name": "gitland",
   "version": "2.0.0",
   "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "start": "node src/backend/server.js",
     "migrate": "node src/backend/migrate_to_postgres.js",
