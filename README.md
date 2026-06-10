@@ -125,7 +125,7 @@ The frontend doesn't use WebGL; it relies on a highly-optimized Vanilla JavaScri
 
 - **Isometric Projections**: Repositories are drawn from back-to-front by pre-sorting their `Y` coordinates. They use 2D canvas pathing with varying height logic based on tiers (`hut`, `house`, `tower`, `skyscraper`), dynamically calculated by combining stars and file size.
 - **Slipstream Warp Drive**: When auto-piloting to another developer's island via the Citizens menu, the engine calculates the distance vector. If it's a long journey, the `warpActive` state engages. This triggers a `screen` compositing operation, drawing hyper-speed particle streaks across the viewport while temporarily suppressing the rendering of small objects to maintain a buttery smooth 60 FPS.
-- **Parallax Backgrounds**: Deep space is comprised of three depth-sorted layers of twinkling stars and multiple overlapping radial gradient nebulae that offset at slower fractional speeds relative to the camera position.
+- **Parallax Backgrounds**: Deep space is comprised of three depth-sorted layers of twinkling stars and multiple overlapping radial gradient nebulae that offset at slower fractional speeds relative to the camera position without any flickering.
 
 ### Data Flow Overview
 
