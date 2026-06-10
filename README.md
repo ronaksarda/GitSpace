@@ -80,7 +80,7 @@ Configure your `.env` variables:
 | `GITHUB_CLIENT_SECRET` | Your GitHub OAuth App Client Secret | `abc123def...` |
 | `SESSION_SECRET` | Secret used to sign session cookies | `super_secret_string` |
 | `PORT` | The port the Node server runs on | `3000` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/gitland` |
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/gitspace` |
 | `APP_URL` | The callback base URL | `http://localhost:3000` |
 
 *💡 Tip: Don't want to set up Postgres right now? Set `DATABASE_URL=sandbox` to use the built-in local JSON database for instant development!*
