@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitSpace — Explore the GitHub Universe</title>
+  <meta name="description"
+    content="GitSpace transforms GitHub repositories into an explorable 2D galaxy. Every developer's account is an island, every repo is a building. Fly through space and discover open source.">
+  <meta property="og:title" content="GitSpace — Explore the GitHub Universe">
+  <meta property="og:description"
+    content="Your GitHub repositories are a world. Every repo is a building. Every developer is an island.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="GitSpace">
+  <meta name="twitter:description" content="Explore the GitHub universe as a 2D galaxy.">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="icon" type="image/png" href="logo.png?v=27">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://avatars.githubusercontent.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=27">
+  <script>
+    // Security & Anti-Inspect Obfuscation
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+      if (e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key)) ||
+        (e.ctrlKey && e.key === 'u')) {
+        e.preventDefault();
+      }
+    });
+
+  </script>
+</head>
+
+<body>
+  <canvas id="world"></canvas>
+
+  <!-- Loading screen -->
+  <div id="loading">
+    <div class="loading-inner">
+      <div class="loading-logo">
+        <img src="logo.png?v=27" alt="GitSpace Logo" style="width: 100%; height: 100%; object-fit: contain;" />
+      </div>
+      <div class="loading-title">GitSpace</div>
+      <div class="loading-sub">Initializing the universe...</div>
+      <div class="loading-bar">
+        <div class="loading-fill" id="loadfill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error screen -->
+  <div id="error-screen" class="hidden">
+    <div class="error-inner">
+      <div class="error-icon">⚠️</div>
+      <h2>Something went wrong</h2>
+      <p id="error-message">An unexpected error occurred.</p>
+      <button class="btn-primary" onclick="window.location.reload()">Reload</button>
+    </div>
+  </div>
+
+  <!-- Offline banner -->
+  <div id="offline-banner" class="hidden">
+    <span>⚡ Connection lost — chunks paused</span>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast-notification" class="hidden"></div>
+
+  <!-- HUD -->
+  <div id="hud" style="display:none">
+    <div id="hud-tl">
+      <div class="hud-logo">GITSPACE</div>
+      <div class="hud-version">v2.0</div>
+      <button id="btn-citizens" class="btn-secondary">Citizens Directory</button>
+      <button id="btn-achievements" class="btn-secondary" onclick="window.toggleAchievements()">Achievements</button>
+    </div>
+    <div id="hud-tr">
+      <div id="speed-control">
+        <span class="speed-label">Speed</span>
+        <input type="range" id="speed-slider" min="5" max="50" value="12">
+      </div>
+      <button id="btn-sync" class="btn-primary" style="display:none;">Sync Island</button>
+      <img id="hud-avatar" src="" alt="" style="cursor:pointer;" title="Go to my island">
+      <span id="hud-name" style="cursor:pointer;" title="Go to my island"></span>
+      <button id="btn-logout" class="btn-secondary">Sign Out</button>
+      <!-- Mobile hamburger -->
+      <button id="btn-mobile-menu" class="btn-secondary mobile-only" style="padding: 4px 8px;">☰</button>
+    </div>
+    <!-- Mobile dropdown -->
+    <div id="mobile-menu-dropdown" class="hidden mobile-only">
+      <button id="btn-citizens-m" class="btn-secondary" onclick="window.toggleCitizens()">Citizens</button>
+      <button id="btn-sync-m" class="btn-primary" onclick="document.getElementById('btn-sync').click()">Sync</button>
+      <button class="btn-secondary" onclick="window.logout()">Sign Out</button>
+    </div>
+    <div id="hud-bl">
+      <div id="hud-coords">X: 0 Y: 0</div>
+      <div id="hud-island">Deep Space</div>
+    </div>
+    <div id="hud-br">
+      <div id="hud-users">0 Developers</div>
+      <div id="hud-repos">0 Repositories</div>
+    </div>
+    <div id="controls-hint">WASD to move · Scroll to zoom · Click building to inspect · ? for shortcuts</div>
+  </div>
+
+  <!-- Repo tooltip -->
+  <div id="repo-tooltip" style="display:none">
+    <div id="tt-name"></div>
+    <div id="tt-lang"></div>
+    <div id="tt-stars"></div>
+    <div id="tt-action">Click to inspect</div>
+  </div>
+
+  <!-- Territory Banner (Feature: Island Overlay) -->
+  <div id="territory-banner" class="hidden">
+    <div class="tb-subtitle">Entering Territory</div>
+    <div id="tb-name" class="tb-title">Deep Space</div>
+  </div>
+
+  <!-- Achievement Tracker Sidebar -->
+  <div id="achievements-sidebar" class="hidden">
+    <div class="sb-header">
+      <h2>🏆 Achievements</h2>
+      <button onclick="window.toggleAchievements()" class="rm-close">×</button>
+    </div>
+    <div class="sb-content">
+      <div id="achievements-list"></div>
+      <button class="btn-primary"
+        style="margin-top: 15px; width: 100%; border-color: var(--red); color: var(--red); background: transparent;"
+        onclick="window.showResetConfirm()">Reset Achievements</button>
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div id="search-wrap">
+    <input id="search-input" type="text" placeholder="Search developer or repo..." autocomplete="off">
+    <div id="search-results"></div>
+  </div>
+
+  <!-- Login screen -->
+  <div id="login-screen">
+    <div class="login-inner">
+      <div class="login-logo">
+        <img src="logo.png?v=27" alt="GitSpace Logo" style="width: 100%; height: 100%; object-fit: contain;" />
+      </div>
+      <h1>GitSpace</h1>
+      <p class="login-tagline">Your GitHub repositories are a world.<br>Every repo is a building. Every developer is an
+        island.</p>
+      <div class="login-features">
+        <div class="login-feature"><span>🚀</span> Fly through the open-source galaxy</div>
+        <div class="login-feature"><span>🏗️</span> Your repos become isometric buildings</div>
+        <div class="login-feature"><span>🔍</span> Discover and explore other developers</div>
+      </div>
+      <a href="/auth/github" class="login-btn">Sign in with GitHub</a>
+      <div class="login-explore" id="btn-explore-guest">Explore as guest →</div>
+    </div>
+  </div>
+
+  <!-- Repo Modal (Feature 6 - Rich) -->
+  <div id="repo-modal" class="hidden">
+    <div class="modal-inner repo-modal-inner">
+      <div id="rm-lang-accent" class="rm-lang-accent"></div>
+      <h2 id="rm-name">Repo Name</h2>
+      <p id="rm-description" class="rm-description">No description provided.</p>
+      <div class="rm-meta">
+        <span id="rm-lang">Language</span> |
+        <span id="rm-stars">⭐ 0</span>
+      </div>
+      <div class="rm-details">
+        <div class="rm-detail-item">
+          <span class="rm-detail-label">Size</span>
+          <span id="rm-size" class="rm-detail-value">0 KB</span>
+          <div class="rm-size-bar">
+            <div class="rm-size-fill" id="rm-size-fill"></div>
+          </div>
+        </div>
+        <div class="rm-detail-item">
+          <span class="rm-detail-label">Updated</span>
+          <span id="rm-updated" class="rm-detail-value">Unknown</span>
+        </div>
+      </div>
+      <div class="modal-buttons">
+        <button id="rm-btn" class="btn-primary">Open on GitHub</button>
+        <button id="btn-close-repo-modal" class="rm-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Profile Modal (Feature 7 - Rich Dashboard) -->
+  <div id="profile-modal" class="hidden">
+    <div class="modal-inner profile-modal-inner">
+      <img id="pm-avatar" src="" alt="">
+      <h2 id="pm-name">Developer</h2>
+      <div id="pm-badges" class="pm-badges" style="display:none"></div>
+      <div class="pm-meta">
+        <span id="pm-repos">0 Repos</span> |
+        <span id="pm-stars">⭐ 0</span>
+      </div>
+      <div class="pm-dashboard">
+        <div class="pm-chart-section">
+          <canvas id="pm-pie-chart" width="120" height="120"></canvas>
+          <div id="pm-pie-legend" class="pm-pie-legend"></div>
+        </div>
+        <div class="pm-top-repos-section">
+          <h3>Top Repositories</h3>
+          <div id="pm-top-repos" class="pm-top-repos"></div>
+        </div>
+      </div>
+      <div class="modal-buttons">
+        <button id="pm-btn-github" class="btn-secondary">GitHub Profile</button>
+        <button id="pm-btn-travel" class="btn-primary">Travel to Island</button>
+        <button id="pm-btn-share" class="btn-secondary">Share Link</button>
+        <button id="btn-close-profile-modal" class="rm-close">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Citizens Sidebar -->
+  <div id="citizens-sidebar" class="hidden">
+    <div class="sidebar-header">
+      <h2>Citizens</h2>
+      <button id="btn-close-citizens" class="rm-close">×</button>
+    </div>
+    <div class="citizens-search-wrap">
+      <input type="text" id="citizens-search" placeholder="Search citizens...">
+    </div>
+    <div id="citizens-list"></div>
+  </div>
+
+  <!-- Shortcuts Overlay (Feature 10) -->
+  <div id="shortcuts-overlay" class="hidden">
+    <div class="shortcuts-inner">
+      <h3>⌨️ Keyboard Shortcuts</h3>
+      <div class="shortcuts-grid">
+        <div class="shortcut-row"><kbd>W A S D</kbd><span>Move ship</span></div>
+        <div class="shortcut-row"><kbd>↑ ← ↓ →</kbd><span>Move ship</span></div>
+        <div class="shortcut-row"><kbd>Scroll</kbd><span>Zoom in/out</span></div>
+        <div class="shortcut-row"><kbd>Click</kbd><span>Inspect building/island</span></div>
+        <div class="shortcut-row"><kbd>P</kbd><span>Screenshot</span></div>
+        <div class="shortcut-row"><kbd>F</kbd><span>Toggle FPS counter</span></div>
+        <div class="shortcut-row"><kbd>H / ?</kbd><span>Toggle this overlay</span></div>
+        <div class="shortcut-row"><kbd>Esc</kbd><span>Close modals</span></div>
+      </div>
+      <button id="btn-restart-tour" class="btn-primary"
+        onclick="console.log('Button clicked!'); if(window.hideShortcutsOverlay) window.hideShortcutsOverlay(); if(window.startTour) window.startTour();"
+        style="margin-top: 15px; width: 100%; padding: 8px; font-size: 13px;">Restart Tutorial</button>
+      <p class="shortcuts-dismiss">Press any key to dismiss</p>
+    </div>
+  </div>
+
+  <!-- Custom Confirm Modal -->
+  <div id="confirm-modal" class="modal hidden">
+    <div class="confirm-inner">
+      <h2>Reset Achievements?</h2>
+      <p>Are you absolutely sure you want to wipe all your unlocked achievements? This action cannot be undone.</p>
+      <div class="confirm-buttons">
+        <button id="btn-confirm-cancel">Cancel</button>
+        <button id="btn-confirm-reset" class="rm-close">Yes, Wipe Data</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast-notification" class="toast hidden"
+    style="position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: var(--bg-panel); color: white; padding: 15px 25px; border-radius: 8px; border: 1px solid var(--cyan); box-shadow: 0 5px 20px rgba(0,0,0,0.5); z-index: 9999; text-align: center; font-family: var(--font-sans); transition: all 0.3s ease;">
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/engine.js?v=27"></script>
+  <script src="js/input.js?v=27"></script>
+  <script src="js/render.js?v=27"></script>
+  <script src="js/network.js?v=27"></script>
+  <script src="js/ui.js?v=27"></script>
+  <script src="js/tour.js?v=27"></script>
+  <script src="js/init.js?v=27"></script>
+</body>
+
+</html>
