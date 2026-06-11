@@ -1916,3 +1916,24 @@ button {
   background: #be123c;
   border-color: #be123c;
 }
+
+/* ── Mobile Responsiveness ────────────────────────────── */
+@media (max-width: 768px) {
+  #hud-tl { top: 10px; left: 10px; }
+  #hud-tr { top: 10px; right: 10px; padding: 6px 10px; }
+  .hud-logo { font-size: 14px; letter-spacing: 2px; }
+  .hud-version { margin-bottom: 6px; }
+  #btn-citizens, #btn-achievements { font-size: 9px; padding: 4px 8px; margin-bottom: 4px; display: block; }
+  #speed-control { display: none; } /* Hide speed control on mobile to save space */
+  #hud-avatar { width: 24px; height: 24px; }
+  #hud-name { display: none; } /* Hide name on mobile to save space */
+  
+  #hud-bl { left: 10px; font-size: 10px; }
+  #hud-br { right: 10px; font-size: 10px; }
+
+  /* Adjust modals for mobile */
+  .rm-inner, .pm-inner, .cb-inner, .ach-inner {
+    padding: 20px;
+    width: 95%;
+  }
+}

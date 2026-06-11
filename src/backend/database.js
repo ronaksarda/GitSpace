@@ -231,12 +231,13 @@ async function initDb() {
             return client.query(`CREATE INDEX IF NOT EXISTS idx_users_login_btree ON users (login);`);
         });
 
-        // Auto-enable Row Level Security (RLS) to secure the Supabase public API
-        await client.query(`ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;`).catch(e => console.log('[DB] Note: Could not auto-enable RLS on sessions:', e.message));
-        await client.query(`ALTER TABLE users ENABLE ROW LEVEL SECURITY;`).catch(e => console.log('[DB] Note: Could not auto-enable RLS on users:', e.message));
-        await client.query(`ALTER TABLE repos ENABLE ROW LEVEL SECURITY;`).catch(e => console.log('[DB] Note: Could not auto-enable RLS on repos:', e.message));
+        // Disable Row Level Security (RLS) because all queries go through the Node backend which is trusted.
+        // RLS being enabled without policies caused all SELECTs to return 0 rows.
+        await client.query(`ALTER TABLE sessions DISABLE ROW LEVEL SECURITY;`).catch(() => {});
+        await client.query(`ALTER TABLE users DISABLE ROW LEVEL SECURITY;`).catch(() => {});
+        await client.query(`ALTER TABLE repos DISABLE ROW LEVEL SECURITY;`).catch(() => {});
 
-        console.log('[DB] PostgreSQL Schema Ready with Auto RLS Enabled.');
+        console.log('[DB] PostgreSQL Schema Ready. RLS Disabled.');
     } catch (err) {
         console.error('[DB] Error initializing database:', err.message);
     } finally {
