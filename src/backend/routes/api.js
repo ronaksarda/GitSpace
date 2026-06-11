@@ -70,18 +70,18 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
 
     // API: Get authenticated user profile
     router.get('/api/me', async (req, res) => {
-        const session = await getSession(req);
-        if (!session || !session.token) {
-            return res.json({ authenticated: false });
-        }
-
-        // Mock response for local development without credentials
-        if (session.token === 'mock_token') {
-            const mockLogin = process.env.MOCK_USER_LOGIN || 'mock_user';
-            return res.json({ login: mockLogin, avatar_url: `https://avatars.githubusercontent.com/${mockLogin}`, authenticated: true });
-        }
-
         try {
+            const session = await getSession(req);
+            if (!session || !session.token) {
+                return res.json({ authenticated: false });
+            }
+
+            // Mock response for local development without credentials
+            if (session.token === 'mock_token') {
+                const mockLogin = process.env.MOCK_USER_LOGIN || 'mock_user';
+                return res.json({ login: mockLogin, avatar_url: `https://avatars.githubusercontent.com/${mockLogin}`, authenticated: true });
+            }
+
             const r = await githubFetch('https://api.github.com/user', session.token);
             if (!r.ok) {
                 if (r.status === 401) {
@@ -94,6 +94,7 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
             db.updateLastLogin(data.login);
             res.json({ ...data, authenticated: true });
         } catch (err) {
+            console.error('[API] /me error:', err.message);
             res.status(500).json({ error: 'Internal error' });
         }
     });
