@@ -2,7 +2,7 @@
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install && g++ -O3 -std=c++17 -pthread -o gitland_engine src/engine/main.cpp"
+    "buildCommand": "npm install && g++ -O3 -std=c++17 -pthread -o src/engine/gitland_engine src/engine/main.cpp"
   },
   "deploy": {
     "startCommand": "node src/backend/server.js",

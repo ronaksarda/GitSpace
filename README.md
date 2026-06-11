@@ -41,8 +41,8 @@ Ready to launch your own local instance of the GitSpace universe?
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/gitland.git
-cd gitland
+git clone https://github.com/ronaksarda/GitSpace.git
+cd GitSpace
 ```
 
 ### 2. Install Dependencies

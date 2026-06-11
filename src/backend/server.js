@@ -130,6 +130,10 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal Server Error' });
 });
 
+process.on('uncaughtException', (err) => {
+    console.error('[Node] Uncaught Exception:', err);
+});
+
 process.on('unhandledRejection', (reason, promise) => {
     console.error('[Node] Unhandled Rejection at:', promise, 'reason:', reason);
 });

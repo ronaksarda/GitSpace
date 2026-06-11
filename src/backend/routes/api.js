@@ -8,6 +8,29 @@ const router = express.Router();
 let activeEngineProcesses = 0;
 const MAX_ENGINE_PROCESSES = 4;
 
+// In-memory GitHub API cache — 5 minute TTL per username
+const githubCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function getCached(key) {
+    const entry = githubCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.ts > CACHE_TTL_MS) {
+        githubCache.delete(key);
+        return null;
+    }
+    return entry.data;
+}
+
+function setCache(key, data) {
+    githubCache.set(key, { data, ts: Date.now() });
+    // Prevent unbounded growth — evict oldest if over 500 entries
+    if (githubCache.size > 500) {
+        const oldest = githubCache.keys().next().value;
+        githubCache.delete(oldest);
+    }
+}
+
 module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
     function getSessionId(req) {
         const match = req.headers.cookie?.match(/(?:^|;\s*)sid=([^;]+)/);
@@ -35,6 +58,9 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
         }
         try {
             const response = await fetch(url, { headers });
+            if (response.status === 401 && token && token !== 'mock_token') {
+                console.warn('[GitHub API] Token expired/revoked for request:', url);
+            }
             return response;
         } catch (err) {
             console.error('[GitHub API] Network error:', err.message);
@@ -60,12 +86,12 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
             if (!r.ok) {
                 if (r.status === 401) {
                     await db.deleteSession(session.sid);
+                    return res.json({ authenticated: false, expired: true });
                 }
                 return res.status(r.status).json({ error: 'GitHub API error' });
             }
             const data = await r.json();
             db.updateLastLogin(data.login);
-            // Include authenticated: true for the frontend
             res.json({ ...data, authenticated: true });
         } catch (err) {
             res.status(500).json({ error: 'Internal error' });
@@ -259,7 +285,13 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 userData = { login: mockLogin, avatar_url: `https://avatars.githubusercontent.com/${mockLogin}` };
             } else {
                 const uRes = await githubFetch('https://api.github.com/user', req.session.token);
-                if (!uRes.ok) return res.status(uRes.status).json({ error: 'GitHub API error' });
+                if (!uRes.ok) {
+                    if (uRes.status === 401) {
+                        await db.deleteSession(req.session.sid);
+                        return res.json({ authenticated: false, expired: true });
+                    }
+                    return res.status(uRes.status).json({ error: 'GitHub API error' });
+                }
                 userData = await uRes.json();
             }
 
@@ -283,9 +315,23 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                     { name: 'mock-repo-3', language: 'C++', size: 35000, stargazers_count: 120, html_url: '#', fork: false, description: 'High-performance spatial engine', updated_at: new Date(Date.now() - 86400000 * 7).toISOString() },
                 ];
             } else {
-                const rRes = await githubFetch('https://api.github.com/user/repos?per_page=100&sort=updated', req.session.token);
-                if (!rRes.ok) return res.status(rRes.status).json({ error: 'GitHub API error' });
-                reposData = await rRes.json();
+                // Check cache before hitting GitHub API
+                const cacheKey = `repos:${userData.login}`;
+                const cached = getCached(cacheKey);
+                if (cached && req.method === 'GET') {
+                    reposData = cached;
+                } else {
+                    const rRes = await githubFetch('https://api.github.com/user/repos?per_page=100&sort=updated', req.session.token);
+                    if (!rRes.ok) {
+                        if (rRes.status === 401) {
+                            await db.deleteSession(req.session.sid);
+                            return res.json({ authenticated: false, expired: true });
+                        }
+                        return res.status(rRes.status).json({ error: 'GitHub API error' });
+                    }
+                    reposData = await rRes.json();
+                    setCache(cacheKey, reposData);
+                }
             }
 
             // Check if user already exists to keep coordinates stable
@@ -314,10 +360,14 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
     });
 
     router.get('/api/chunk', async (req, res) => {
-        const minX = parseFloat(req.query.minX) || -5000;
-        const minY = parseFloat(req.query.minY) || -5000;
-        const maxX = parseFloat(req.query.maxX) || 5000;
-        const maxY = parseFloat(req.query.maxY) || 5000;
+        const minX = parseFloat(req.query.minX);
+        const minY = parseFloat(req.query.minY);
+        const maxX = parseFloat(req.query.maxX);
+        const maxY = parseFloat(req.query.maxY);
+
+        if (isNaN(minX) || isNaN(minY) || isNaN(maxX) || isNaN(maxY)) {
+            return res.status(400).json({ error: 'minX, minY, maxX, maxY must be valid numbers' });
+        }
 
         try {
             const data = await db.getChunks(minX, minY, maxX, maxY);
