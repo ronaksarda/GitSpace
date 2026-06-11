@@ -238,13 +238,17 @@ function showProfileModal(island) {
   const topReposEl = document.getElementById('pm-top-repos');
   if (topReposEl) {
     const sorted = [...island.buildings].sort((a, b) => b.stars - a.stars).slice(0, 5);
-    topReposEl.innerHTML = sorted.map(r =>
-      `<div class="pm-repo-item">
-        <span class="pm-repo-dot" style="background:${langColor(r.language)}"></span>
-        <span class="pm-repo-name">${escapeHTML(r.name)}</span>
-        <span class="pm-repo-stars">⭐ ${r.stars}</span>
-      </div>`
-    ).join('');
+    if (sorted.length === 0) {
+      topReposEl.innerHTML = '<div class="pm-repo-item" style="color: #666; font-style: italic; justify-content: center;">No repositories to display</div>';
+    } else {
+      topReposEl.innerHTML = sorted.map(r =>
+        `<div class="pm-repo-item">
+          <span class="pm-repo-dot" style="background:${langColor(r.language)}"></span>
+          <span class="pm-repo-name">${escapeHTML(r.name)}</span>
+          <span class="pm-repo-stars">⭐ ${r.stars}</span>
+        </div>`
+      ).join('');
+    }
   }
 
   // Language pie chart (Feature 7)
@@ -349,7 +353,12 @@ function drawLanguagePie(buildings) {
   }
 
   const total = buildings.length;
-  if (total === 0) return;
+  const legendEl = document.getElementById('pm-pie-legend');
+  
+  if (total === 0) {
+    if (legendEl) legendEl.innerHTML = '<div class="pie-legend-item" style="color: #666; font-style: italic; justify-content: center;">No repos</div>';
+    return;
+  }
 
   let startAngle = -Math.PI / 2;
   const entries = Object.entries(langCounts).sort((a, b) => b[1] - a[1]);
@@ -383,7 +392,6 @@ function drawLanguagePie(buildings) {
   pctx.fillText('repos', cx, cy + 8);
 
   // Legend
-  const legendEl = document.getElementById('pm-pie-legend');
   if (legendEl) {
     legendEl.innerHTML = entries.slice(0, 6).map(([lang, count]) =>
       `<div class="pie-legend-item">
