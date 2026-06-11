@@ -19,7 +19,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: isDev ? 100000 : 5,
+    max: isDev ? 100000 : 10000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many authentication attempts. Try again in 15 minutes.' }
@@ -27,7 +27,7 @@ const authLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: isDev ? 100000 : 100,
+    max: isDev ? 100000 : 10000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests. Try again later.' }
@@ -35,7 +35,7 @@ const apiLimiter = rateLimit({
 
 const heavyLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: isDev ? 100000 : 20,
+    max: isDev ? 100000 : 10000,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Rate limit exceeded for this resource. Try again later.' }
