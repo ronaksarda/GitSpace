@@ -422,8 +422,9 @@ let initialZoom = null;
 let touchDragDistance = 0;
 
 canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
   if (e.touches.length === 1) {
-    isDragging = true;
+    window.isDragging = true;
     previousTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY };
     autopilotTarget = null;
     touchDragDistance = 0;
@@ -436,7 +437,7 @@ canvas.addEventListener('touchstart', e => {
       moveX: 0, moveY: 0, dist: 0 
     };
   } else if (e.touches.length === 2) {
-    isDragging = false;
+    window.isDragging = false;
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
@@ -445,21 +446,32 @@ canvas.addEventListener('touchstart', e => {
 }, { passive: false });
 
 canvas.addEventListener('touchmove', e => {
-  if (e.touches.length === 1 && isDragging && previousTouch) {
+  e.preventDefault();
+  if (e.touches.length === 1 && window.isDragging && previousTouch) {
     const touch = e.touches[0];
     
     if (window.touchJoystick) {
       const dx = touch.clientX - window.touchJoystick.originX;
       const dy = touch.clientY - window.touchJoystick.originY;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      window.touchJoystick.dist = dist;
       
       touchDragDistance += Math.sqrt(Math.pow(touch.clientX - previousTouch.x, 2) + Math.pow(touch.clientY - previousTouch.y, 2));
 
-      if (dist > 5) {
+      const maxRadius = 55;
+      if (dist > maxRadius) {
+        window.touchJoystick.originX += (dx / dist) * (dist - maxRadius);
+        window.touchJoystick.originY += (dy / dist) * (dist - maxRadius);
+        // Recalculate after moving origin
+        const newDx = touch.clientX - window.touchJoystick.originX;
+        const newDy = touch.clientY - window.touchJoystick.originY;
+        const newDist = Math.sqrt(newDx * newDx + newDy * newDy);
+        window.touchJoystick.dist = newDist;
+        window.touchJoystick.moveX = newDx / newDist;
+        window.touchJoystick.moveY = newDy / newDist;
+      } else {
+        window.touchJoystick.dist = dist;
         window.touchJoystick.moveX = dx / dist;
         window.touchJoystick.moveY = dy / dist;
-        e.preventDefault();
       }
     }
 
@@ -467,7 +479,6 @@ canvas.addEventListener('touchmove', e => {
     lastMouse.x = touch.clientX;
     lastMouse.y = touch.clientY;
   } else if (e.touches.length === 2 && initialPinchDistance) {
-    e.preventDefault();
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     const currentDistance = Math.sqrt(dx * dx + dy * dy);
@@ -481,18 +492,34 @@ canvas.addEventListener('touchend', e => {
     initialPinchDistance = null;
   }
   if (e.touches.length === 0) {
-    if (isDragging && touchDragDistance < 5 && previousTouch) {
+    if (window.isDragging && touchDragDistance < 8) {
       const mx = lastMouse.x;
       const my = lastMouse.y;
       const hit = findBuildingAtPoint(mx, my);
-      const island = findIslandAtPoint(mx, my);
-      if (!hit && !island) {
-         const worldX = camera.x + (mx - canvas.width / 2) / camera.zoom;
-         const worldY = camera.y + (my - canvas.height / 2) / camera.zoom;
-         autopilotTarget = { x: worldX, y: worldY };
+      if (hit && hit.building) {
+        // trigger the same modal logic as mouseup
+        const b = hit.building;
+        document.getElementById('rm-name').textContent = b.name;
+        document.getElementById('rm-lang').textContent = b.language + (b.isFork ? ' (Fork)' : '');
+        document.getElementById('rm-stars').textContent = '⭐ ' + (b.stars || 0).toLocaleString();
+        const rmDesc = document.getElementById('rm-description');
+        if (rmDesc) rmDesc.textContent = b.description || 'No description provided.';
+        const rmSize = document.getElementById('rm-size');
+        if (rmSize) rmSize.textContent = formatSize(b.size);
+        const rmUpdated = document.getElementById('rm-updated');
+        if (rmUpdated) rmUpdated.textContent = b.updatedAt ? timeAgo(b.updatedAt) : 'Unknown';
+        document.getElementById('rm-btn').onclick = () => { if (b.url) window.open(b.url, '_blank'); };
+        document.getElementById('repo-modal').classList.remove('hidden');
+        
+        window.isDragging = false;
+        previousTouch = null;
+        window.touchJoystick = null;
+        return;
       }
+      const island = findIslandAtPoint(mx, my);
+      if (island) showProfileModal(island);
     }
-    isDragging = false;
+    window.isDragging = false;
     previousTouch = null;
     window.touchJoystick = null;
   }

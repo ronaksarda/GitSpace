@@ -7,6 +7,8 @@ const ctx = canvas.getContext('2d', { alpha: false });
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
+const isMobile = () => window.innerWidth < 768;
+
 // Global nearest island state set by checkProximity
 let nearestIsland = null;
 let nearestDist = Infinity;
@@ -29,7 +31,7 @@ let nearbyRepo = null;
 let animFrame = 0;
 let playerAngle = 0;
 let trails = [];
-let isDragging = false;
+window.isDragging = false;
 let lastMouse = { x: 0, y: 0 };
 let warpActive = false;
 let warpProgress = 0;
@@ -168,6 +170,14 @@ function updateHUD() {
   const loginScreen = document.getElementById('login-screen');
   if (loginScreen && !loginScreen.classList.contains('hidden')) {
     return;
+  }
+
+  const hudBl = document.getElementById('hud-bl');
+  const hudBr = document.getElementById('hud-br');
+  if (hudBl && hudBr) {
+    const hudY = window.innerHeight - (isMobile() ? 60 : 30);
+    hudBl.style.bottom = (window.innerHeight - hudY) + 'px';
+    hudBr.style.bottom = (window.innerHeight - hudY) + 'px';
   }
 
   document.getElementById('hud-coords').textContent = `X: ${Math.round(player.x)} Y: ${Math.round(player.y)}`;

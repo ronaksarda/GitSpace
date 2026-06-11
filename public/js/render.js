@@ -810,10 +810,10 @@ function drawWarpOverlay() {
 
 // ── Minimap & Compass ─────────────────────────────────
 function drawMinimap() {
-  const mmSize = 150;
-  const mmPadding = 20;
+  const mmSize = isMobile() ? 90 : 150;
+  const mmPadding = isMobile() ? 8 : 20;
   const mmx = canvas.width - mmSize - mmPadding;
-  const mmy = canvas.height - mmSize - mmPadding;
+  const mmy = isMobile() ? 8 : canvas.height - mmSize - mmPadding;
 
   // Background with rounded corners
   ctx.fillStyle = 'rgba(10, 10, 25, 0.85)';
@@ -896,10 +896,10 @@ function drawCompass() {
     const dx = closestIsland.cx - player.x;
     const dy = closestIsland.cy - player.y;
     const angle = Math.atan2(dy, dx);
-    const radius = 80;
+    const radius = isMobile() ? 36 : 80;
 
-    const px = sx + Math.cos(angle) * radius;
-    const py = sy + Math.sin(angle) * radius;
+    const px = isMobile() ? canvas.width / 2 : canvas.width - 80;
+    const py = isMobile() ? radius + 16 : canvas.height - 80;
 
     ctx.save();
     ctx.translate(px, py);
@@ -944,7 +944,8 @@ function drawFPS() {
   ctx.fillStyle = fpsDisplay >= 50 ? '#22c55e' : fpsDisplay >= 30 ? '#eab308' : '#ef4444';
   ctx.font = 'bold 12px monospace';
   ctx.textAlign = 'left';
-  ctx.fillText(fpsDisplay + ' FPS', 10, canvas.height - 10);
+  const fpsY = canvas.height - (isMobile() ? 60 : 10);
+  ctx.fillText(fpsDisplay + ' FPS', 10, fpsY);
 }
 
 // ── Check proximity to repos ──────────────────────────
