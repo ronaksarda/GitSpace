@@ -820,7 +820,8 @@ button {
   #speed-control,
   #btn-sync,
   #hud-name,
-  #btn-logout {
+  #btn-logout,
+  #btn-achievements {
     display: none !important;
   }
 
@@ -850,6 +851,10 @@ button {
     bottom: 12px;
     left: 12px;
     font-size: 10px;
+  }
+  
+  #hud-coords {
+    display: none;
   }
 
   #hud-br {

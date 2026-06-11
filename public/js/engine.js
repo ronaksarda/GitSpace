@@ -102,21 +102,26 @@ function buildIsland(login, userData) {
   const { cx, cy, avatar, primaryLanguage, repos, isActive } = userData;
   const color = langColor(primaryLanguage);
   const repoCount = repos.length;
-  const islandRadius = Math.max(120, Math.min(400, 80 + repoCount * 18));
+  const baseRadius = Math.max(120, 80 + repoCount * 18);
 
   let seed = 0;
   for (let i = 0; i < login.length; i++) seed += login.charCodeAt(i);
   const rng = (s) => { s = Math.sin(s + seed) * 43758.5; return s - Math.floor(s); };
+
+  let maxDist = 0;
 
   const buildings = repos.map((repo, i) => {
     let bx = repo.x;
     let by = repo.y;
     if (bx === undefined || bx === null || by === undefined || by === null) {
       const angle = (i / repoCount) * Math.PI * 2 + rng(i) * 0.5;
-      const dist = islandRadius * 0.25 + rng(i + 100) * islandRadius * 0.55;
+      const dist = baseRadius * 0.25 + rng(i + 100) * baseRadius * 0.55;
       bx = cx + Math.cos(angle) * dist;
       by = cy + Math.sin(angle) * dist;
     }
+    
+    const distFromCenter = Math.sqrt(Math.pow(bx - cx, 2) + Math.pow(by - cy, 2));
+    if (distFromCenter > maxDist) maxDist = distFromCenter;
     const score = (repo.stars || 0) * 10 + Math.sqrt(repo.size || 0);
     const tier = score > 5000 ? 'skyscraper' : score > 500 ? 'tower' : score > 50 ? 'house' : 'hut';
     const height = { skyscraper: 70, tower: 45, house: 30, hut: 18 }[tier];
@@ -139,6 +144,8 @@ function buildIsland(login, userData) {
 
   // Pre-sort buildings by Y coordinate for correct rendering depth
   buildings.sort((a, b) => a.y - b.y);
+
+  const islandRadius = Math.max(120, maxDist + 60);
 
   const img = new Image();
   img.crossOrigin = 'anonymous';
@@ -238,6 +245,13 @@ function gameLoop() {
   if (keys['arrowdown'] || keys['s']) { moveDy = 1; moving = true; autopilotTarget = null; }
   if (keys['arrowleft'] || keys['a']) { moveDx = -1; moving = true; autopilotTarget = null; }
   if (keys['arrowright'] || keys['d']) { moveDx = 1; moving = true; autopilotTarget = null; }
+
+  if (window.touchJoystick && (window.touchJoystick.moveX !== 0 || window.touchJoystick.moveY !== 0)) {
+    moveDx = window.touchJoystick.moveX;
+    moveDy = window.touchJoystick.moveY;
+    moving = true;
+    autopilotTarget = null;
+  }
 
   if (moving) {
     const len = Math.sqrt(moveDx * moveDx + moveDy * moveDy);
@@ -368,6 +382,32 @@ function gameLoop() {
   drawMinimap();
   drawCompass();
   drawFPS();
+
+  // Draw virtual joystick
+  if (window.isDragging && window.touchJoystick && window.touchJoystick.originX && window.touchJoystick.dist > 5) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform for UI
+    
+    // Draw base
+    ctx.beginPath();
+    ctx.arc(window.touchJoystick.originX, window.touchJoystick.originY, 50, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.1)';
+    ctx.strokeStyle = 'rgba(6, 182, 212, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.fill();
+    ctx.stroke();
+
+    // Draw nub
+    const nubDist = Math.min(50, window.touchJoystick.dist);
+    const nx = window.touchJoystick.originX + window.touchJoystick.moveX * nubDist;
+    const ny = window.touchJoystick.originY + window.touchJoystick.moveY * nubDist;
+    
+    ctx.beginPath();
+    ctx.arc(nx, ny, 25, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(6, 182, 212, 0.5)';
+    ctx.fill();
+    ctx.restore();
+  }
 
   checkProximity();
   updateHUD();

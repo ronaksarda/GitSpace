@@ -429,6 +429,12 @@ canvas.addEventListener('touchstart', e => {
     touchDragDistance = 0;
     lastMouse.x = e.touches[0].clientX;
     lastMouse.y = e.touches[0].clientY;
+    
+    window.touchJoystick = { 
+      originX: e.touches[0].clientX, 
+      originY: e.touches[0].clientY, 
+      moveX: 0, moveY: 0, dist: 0 
+    };
   } else if (e.touches.length === 2) {
     isDragging = false;
     const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -441,17 +447,21 @@ canvas.addEventListener('touchstart', e => {
 canvas.addEventListener('touchmove', e => {
   if (e.touches.length === 1 && isDragging && previousTouch) {
     const touch = e.touches[0];
-    const dx = touch.clientX - previousTouch.x;
-    const dy = touch.clientY - previousTouch.y;
+    
+    if (window.touchJoystick) {
+      const dx = touch.clientX - window.touchJoystick.originX;
+      const dy = touch.clientY - window.touchJoystick.originY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      window.touchJoystick.dist = dist;
+      
+      touchDragDistance += Math.sqrt(Math.pow(touch.clientX - previousTouch.x, 2) + Math.pow(touch.clientY - previousTouch.y, 2));
 
-    touchDragDistance += Math.sqrt(dx * dx + dy * dy);
-
-    if (touchDragDistance > 5) {
-      e.preventDefault();
+      if (dist > 5) {
+        window.touchJoystick.moveX = dx / dist;
+        window.touchJoystick.moveY = dy / dist;
+        e.preventDefault();
+      }
     }
-
-    camera.x -= dx / camera.zoom;
-    camera.y -= dy / camera.zoom;
 
     previousTouch = { x: touch.clientX, y: touch.clientY };
     lastMouse.x = touch.clientX;
@@ -471,7 +481,19 @@ canvas.addEventListener('touchend', e => {
     initialPinchDistance = null;
   }
   if (e.touches.length === 0) {
+    if (isDragging && touchDragDistance < 5 && previousTouch) {
+      const mx = lastMouse.x;
+      const my = lastMouse.y;
+      const hit = findBuildingAtPoint(mx, my);
+      const island = findIslandAtPoint(mx, my);
+      if (!hit && !island) {
+         const worldX = camera.x + (mx - canvas.width / 2) / camera.zoom;
+         const worldY = camera.y + (my - canvas.height / 2) / camera.zoom;
+         autopilotTarget = { x: worldX, y: worldY };
+      }
+    }
     isDragging = false;
     previousTouch = null;
+    window.touchJoystick = null;
   }
 });
