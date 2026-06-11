@@ -25,7 +25,8 @@ const pool = isSandbox ? null : new Pool({
     ssl: process.env.DATABASE_SSL_CA
         ? { ca: require('fs').readFileSync(process.env.DATABASE_SSL_CA), rejectUnauthorized: true }
         : { rejectUnauthorized: false },
-    max: 20 // Cap connections to prevent DB exhaustion DDoS
+    max: 20, // Cap connections to prevent DB exhaustion DDoS
+    connectionTimeoutMillis: 5000 // Prevent app from hanging if DB is unresponsive
 });
 
 if (pool) {
@@ -159,8 +160,9 @@ async function initDb() {
         return;
     }
     console.log('[DB] Initializing PostgreSQL Database Schema...');
-    const client = await pool.connect();
+    let client;
     try {
+        client = await pool.connect();
         await client.query(`
             CREATE TABLE IF NOT EXISTS sessions (
                 sid VARCHAR(64) PRIMARY KEY,
@@ -242,7 +244,7 @@ async function initDb() {
     } catch (err) {
         console.error('[DB] Error initializing database:', err.message);
     } finally {
-        client.release();
+        if (client) client.release();
     }
 }
 
