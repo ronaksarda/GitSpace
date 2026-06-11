@@ -896,10 +896,10 @@ function drawCompass() {
     const dx = closestIsland.cx - player.x;
     const dy = closestIsland.cy - player.y;
     const angle = Math.atan2(dy, dx);
-    const radius = isMobile() ? 36 : 80;
+    const radius = isMobile() ? 55 : 80;
 
-    const px = isMobile() ? canvas.width / 2 : canvas.width - 80;
-    const py = isMobile() ? radius + 16 : canvas.height - 80;
+    const px = sx + Math.cos(angle) * radius;
+    const py = sy + Math.sin(angle) * radius;
 
     ctx.save();
     ctx.translate(px, py);
