@@ -28,10 +28,17 @@ async function init() {
     } catch (e) { }
 
     loadFill.style.width = '50%';
-    try {
-      const res = await fetch('/api/stats');
-      worldData = await res.json();
-    } catch (e) { }
+    async function updateStats() {
+      try {
+        const res = await fetch('/api/stats');
+        worldData = await res.json();
+        const usersEl = document.getElementById('hud-users');
+        const reposEl = document.getElementById('hud-repos');
+        if (usersEl) usersEl.textContent = (worldData.totalUsers || 0) + ' Developers';
+        if (reposEl) reposEl.textContent = (worldData.totalRepos || 0) + ' Repositories';
+      } catch (e) { }
+    }
+    await updateStats();
 
     loadFill.style.width = '80%';
 
@@ -111,6 +118,9 @@ async function init() {
           
           if (typeof loadedChunks !== 'undefined') loadedChunks.clear();
           if (typeof islands !== 'undefined') islands.length = 0;
+          
+          // Refresh stats now that our island is in the database!
+          updateStats();
         } else if (repoData.success) {
           // No repos but still logged in - spawn at island
           player.x = repoData.cx;
@@ -120,6 +130,9 @@ async function init() {
           
           if (typeof loadedChunks !== 'undefined') loadedChunks.clear();
           if (typeof islands !== 'undefined') islands.length = 0;
+          
+          // Refresh stats
+          updateStats();
         }
       } catch (e) {
         console.error('Failed to pre-fetch repos:', e);
@@ -157,6 +170,9 @@ async function init() {
         }
       } catch (e) { }
     }
+
+    // Poll stats every 30 seconds to keep live count updated
+    setInterval(updateStats, 30000);
 
     gameLoop();
 
