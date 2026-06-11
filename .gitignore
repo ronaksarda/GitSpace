@@ -13,7 +13,6 @@ jspm_packages/
 *.db
 *.sqlite
 src/backend/local_db.json
-src/backend/sandbox_db.json
 src/backend/sandbox_stress_db.json
 
 # C++ Build artifacts
