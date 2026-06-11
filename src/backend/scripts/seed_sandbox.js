@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const dbPath = path.join(__dirname, 'sandbox_db.json');
+const dbPath = path.join(__dirname, '..', 'sandbox_db.json');
 
 const data = {
     sessions: {},
