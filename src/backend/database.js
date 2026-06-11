@@ -4,7 +4,9 @@ const fs = require('fs');
 const path = require('path');
 
 const connectionString = process.env.DATABASE_URL;
-const isSandbox = connectionString === 'sandbox' || process.env.USE_SANDBOX === 'true';
+// Force Postgres if a real URL is provided, even if USE_SANDBOX is accidentally left on
+const isSandbox = (connectionString === 'sandbox' || process.env.USE_SANDBOX === 'true') 
+                  && !(connectionString && connectionString.startsWith('postgres'));
 const SANDBOX_FILE = process.env.SANDBOX_DB_FILE || path.join(__dirname, 'sandbox_db.json');
 
 if (!isSandbox) {
