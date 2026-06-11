@@ -223,15 +223,14 @@ async function initDb() {
         }
 
         // Indexes and Extensions
-        await client.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`).catch(() => {});
+        // Note: Dropped pg_trgm GIN indexes as they consume massive amounts of memory on the Supabase Free Tier.
+        await client.query(`DROP INDEX IF EXISTS idx_repos_name;`).catch(() => {});
+        await client.query(`DROP INDEX IF EXISTS idx_users_login_trgm;`).catch(() => {});
+        
         await client.query(`CREATE INDEX IF NOT EXISTS idx_users_cx_cy ON users (cx, cy);`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_repos_login ON repos (login);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_repos_name ON repos USING gin (name gin_trgm_ops);`).catch(() => {
-            return client.query(`CREATE INDEX IF NOT EXISTS idx_repos_name_btree ON repos (name);`);
-        });
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_users_login_trgm ON users USING gin (login gin_trgm_ops);`).catch(() => {
-            return client.query(`CREATE INDEX IF NOT EXISTS idx_users_login_btree ON users (login);`);
-        });
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_repos_name_btree ON repos (name);`);
+        await client.query(`CREATE INDEX IF NOT EXISTS idx_users_login_btree ON users (login);`);
 
         // Disable Row Level Security (RLS) because all queries go through the Node backend which is trusted.
         // RLS being enabled without policies caused all SELECTs to return 0 rows.
