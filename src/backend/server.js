@@ -137,7 +137,7 @@ process.on('unhandledRejection', (reason, promise) => {
 (async () => {
     await db.initDb();
     app.listen(PORT, () => {
-        console.log(`GitSpace server running at http://localhost:${PORT}`);
+        console.log(`GitSpace server running at ${APP_URL} (Port: ${PORT})`);
         if (!CLIENT_ID || !CLIENT_SECRET) {
             console.warn('[STARTUP] WARNING: GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET not set in .env');
         }
