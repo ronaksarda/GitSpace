@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const connectionString = process.env.DATABASE_URL;
-const isSandbox = connectionString === 'sandbox' || process.env.USE_SANDBOX === 'true';
+let isSandbox = connectionString === 'sandbox' || process.env.USE_SANDBOX === 'true';
 const SANDBOX_FILE = process.env.SANDBOX_DB_FILE || path.join(__dirname, 'sandbox_db.json');
 
 if (!isSandbox) {
@@ -168,7 +168,10 @@ async function initDb() {
             console.error(`[DB] Connection failed. Retries left: ${retries - 1}. Error: ${err.message}`);
             retries--;
             if (retries === 0) {
-                console.error('[DB] FATAL: Could not connect to database to initialize schema.');
+                console.error('[DB] FATAL: Could not connect to database to initialize schema. Auto-falling back to Sandbox mode!');
+                isSandbox = true;
+                const data = loadSandboxData();
+                saveSandboxData(data); // Ensure sandbox file exists
                 return;
             }
             await new Promise(r => setTimeout(r, 3000));
