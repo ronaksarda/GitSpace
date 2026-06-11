@@ -26,7 +26,7 @@ const pool = isSandbox ? null : new Pool({
         ? { ca: require('fs').readFileSync(process.env.DATABASE_SSL_CA), rejectUnauthorized: true }
         : { rejectUnauthorized: false },
     max: 20, // Cap connections to prevent DB exhaustion DDoS
-    connectionTimeoutMillis: 5000 // Prevent app from hanging if DB is unresponsive
+    connectionTimeoutMillis: 15000 // Allow up to 15s for Supabase to wake up from pause
 });
 
 if (pool) {
@@ -161,8 +161,23 @@ async function initDb() {
     }
     console.log('[DB] Initializing PostgreSQL Database Schema...');
     let client;
+    let retries = 3;
+    while (retries > 0) {
+        try {
+            client = await pool.connect();
+            break; // connection successful
+        } catch (err) {
+            console.error(`[DB] Connection failed. Retries left: ${retries - 1}. Error: ${err.message}`);
+            retries--;
+            if (retries === 0) {
+                console.error('[DB] FATAL: Could not connect to database to initialize schema.');
+                return;
+            }
+            await new Promise(r => setTimeout(r, 3000));
+        }
+    }
+
     try {
-        client = await pool.connect();
         await client.query(`
             CREATE TABLE IF NOT EXISTS sessions (
                 sid VARCHAR(64) PRIMARY KEY,
