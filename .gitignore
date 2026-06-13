@@ -34,3 +34,4 @@ lerna-debug.log*
 # OS metadata
 .DS_Store
 Thumbs.db
+src/backend/scripts/seed_sandbox.js

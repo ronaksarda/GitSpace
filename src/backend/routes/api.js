@@ -181,6 +181,15 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
         return { cx: baseX, cy: baseY, repos: scaledPlaced };
     }
 
+    const engineQueue = [];
+
+    function processEngineQueue() {
+        if (engineQueue.length === 0 || activeEngineProcesses >= MAX_ENGINE_PROCESSES) return;
+        const task = engineQueue.shift();
+        activeEngineProcesses++;
+        task();
+    }
+
     // Generate Layout using C++ Engine with identical Javascript-based fallback
     function generateLayoutEngine(username, reposData, baseX, baseY) {
         return new Promise((resolve) => {
@@ -195,86 +204,90 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 return resolve(generateLayoutJS(sorted, baseX, baseY));
             }
 
-            if (activeEngineProcesses >= MAX_ENGINE_PROCESSES) {
-                console.warn('[Engine] Too many active engine processes, using deterministic JS layout engine');
-                return resolve(generateLayoutJS(sorted, baseX, baseY));
-            }
+            const executeEngine = () => {
+                let isResolved = false;
 
-            activeEngineProcesses++;
-            let isResolved = false;
+                const cleanup = () => {
+                    if (!isResolved) {
+                        isResolved = true;
+                        activeEngineProcesses--;
+                        processEngineQueue();
+                    }
+                };
 
-            const cleanup = () => {
-                if (!isResolved) {
-                    isResolved = true;
-                    activeEngineProcesses--;
+                const proc = spawn(enginePath);
+                let out = '';
+                let err = '';
+
+                const timeout = setTimeout(() => {
+                    proc.kill();
+                    cleanup();
+                    console.warn('[Engine] C++ engine timed out, falling back to deterministic JS layout engine');
+                    resolve(generateLayoutJS(sorted, baseX, baseY));
+                }, 5000);
+
+                proc.stdout.on('data', d => out += d);
+                proc.stderr.on('data', d => err += d);
+
+                proc.on('close', code => {
+                    clearTimeout(timeout);
+                    cleanup();
+                    if (code !== 0) {
+                        console.warn('[Engine] C++ engine failed with code', code, 'error:', err, '- falling back to deterministic JS layout engine');
+                        return resolve(generateLayoutJS(sorted, baseX, baseY));
+                    }
+                    try {
+                        const result = JSON.parse(out);
+                        const scale = 8.0;
+                        const reposWithMeta = result.map((p, idx) => {
+                            const original = sorted[idx] || {};
+                            const dx = p.x - baseX;
+                            const dy = p.y - baseY;
+                            return {
+                                ...p,
+                                x: baseX + dx * scale,
+                                y: baseY + dy * scale,
+                                description: original.description || '',
+                                updatedAt: original.updated_at || original.updatedAt || null
+                            };
+                        });
+                        resolve({ cx: baseX, cy: baseY, repos: reposWithMeta });
+                    } catch (e) {
+                        console.warn('[Engine] Parse error from C++ output:', e.message, '- falling back to JS engine');
+                        resolve(generateLayoutJS(sorted, baseX, baseY));
+                    }
+                });
+
+                proc.on('error', e => {
+                    clearTimeout(timeout);
+                    cleanup();
+                    console.warn('[Engine] Process error:', e.message, '- falling back to JS engine');
+                    resolve(generateLayoutJS(sorted, baseX, baseY));
+                });
+
+                let inputLines = [];
+                inputLines.push(`${baseX} ${baseY}`);
+                for (const r of sorted) {
+                    const stars = r.stargazers_count || r.stars || 0;
+                    const size = r.size || 0;
+                    const isFork = (r.fork || r.isFork) ? "1" : "0";
+                    const language = String(r.language || "Other").replace(/[\r\n\t]/g, ' ').trim();
+                    const name = String(r.name || "").replace(/[\r\n\t]/g, ' ').trim();
+                    const url = String(r.html_url || r.url || "").replace(/[\r\n\t]/g, '').trim();
+                    inputLines.push(`${stars}\t${size}\t${isFork}\t${language}\t${name}\t${url}`);
                 }
+                const inputData = inputLines.join('\n') + '\n';
+
+                proc.stdin.write(inputData);
+                proc.stdin.end();
             };
 
-            const proc = spawn(enginePath);
-            let out = '';
-            let err = '';
-
-            const timeout = setTimeout(() => {
-                proc.kill();
-                cleanup();
-                console.warn('[Engine] C++ engine timed out, falling back to deterministic JS layout engine');
-                resolve(generateLayoutJS(sorted, baseX, baseY));
-            }, 5000);
-
-            proc.stdout.on('data', d => out += d);
-            proc.stderr.on('data', d => err += d);
-
-            proc.on('close', code => {
-                clearTimeout(timeout);
-                cleanup();
-                if (code !== 0) {
-                    console.warn('[Engine] C++ engine failed with code', code, 'error:', err, '- falling back to deterministic JS layout engine');
-                    return resolve(generateLayoutJS(sorted, baseX, baseY));
-                }
-                try {
-                    const result = JSON.parse(out);
-                    const scale = 8.0;
-                    const reposWithMeta = result.map((p, idx) => {
-                        const original = sorted[idx] || {};
-                        const dx = p.x - baseX;
-                        const dy = p.y - baseY;
-                        return {
-                            ...p,
-                            x: baseX + dx * scale,
-                            y: baseY + dy * scale,
-                            description: original.description || '',
-                            updatedAt: original.updated_at || original.updatedAt || null
-                        };
-                    });
-                    resolve({ cx: baseX, cy: baseY, repos: reposWithMeta });
-                } catch (e) {
-                    console.warn('[Engine] Parse error from C++ output:', e.message, '- falling back to JS engine');
-                    resolve(generateLayoutJS(sorted, baseX, baseY));
-                }
-            });
-
-            proc.on('error', e => {
-                clearTimeout(timeout);
-                cleanup();
-                console.warn('[Engine] Process error:', e.message, '- falling back to JS engine');
-                resolve(generateLayoutJS(sorted, baseX, baseY));
-            });
-
-            let inputLines = [];
-            inputLines.push(`${baseX} ${baseY}`);
-            for (const r of sorted) {
-                const stars = r.stargazers_count || r.stars || 0;
-                const size = r.size || 0;
-                const isFork = (r.fork || r.isFork) ? "1" : "0";
-                const language = String(r.language || "Other").replace(/[\r\n\t]/g, ' ').trim();
-                const name = String(r.name || "").replace(/[\r\n\t]/g, ' ').trim();
-                const url = String(r.html_url || r.url || "").replace(/[\r\n\t]/g, '').trim();
-                inputLines.push(`${stars}\t${size}\t${isFork}\t${language}\t${name}\t${url}`);
+            if (activeEngineProcesses >= MAX_ENGINE_PROCESSES) {
+                engineQueue.push(executeEngine);
+            } else {
+                activeEngineProcesses++;
+                executeEngine();
             }
-            const inputData = inputLines.join('\n') + '\n';
-
-            proc.stdin.write(inputData);
-            proc.stdin.end();
         });
     }
 

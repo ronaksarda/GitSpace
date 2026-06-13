@@ -791,26 +791,31 @@ async function findFreeSpot(startX, startY, minDistance = 2000) {
             }
             if (!collision) return { x, y };
             step++;
-            const angle = step * Math.PI / 4;
-            const radius = step * 1000;
+            const angle = step * 2.39996;
+            const radius = Math.sqrt(step) * 1000;
             x = startX + Math.cos(angle) * radius;
             y = startY + Math.sin(angle) * radius;
         }
     }
+    // Load existing coordinates into memory ONCE to avoid spamming the DB pool 
+    // with sequential SELECT queries inside a while loop, which causes massive lag
+    const res = await pool.query('SELECT cx, cy FROM users');
+    const existingUsers = res.rows;
 
     let x = startX, y = startY, step = 0;
     while (true) {
-        const res = await pool.query(
-            `SELECT COUNT(*) as count FROM users 
-             WHERE cx BETWEEN $1::float - $3::float AND $1::float + $3::float 
-             AND cy BETWEEN $2::float - $3::float AND $2::float + $3::float 
-             AND sqrt(power(cx - $1::float, 2) + power(cy - $2::float, 2)) < $3::float`,
-            [x, y, minDistance]
-        );
-        if (parseInt(res.rows[0].count) === 0) return { x, y };
+        let collision = false;
+        for (const u of existingUsers) {
+            if (Math.sqrt(Math.pow(u.cx - x, 2) + Math.pow(u.cy - y, 2)) < minDistance) {
+                collision = true;
+                break;
+            }
+        }
+        if (!collision) return { x, y };
         step++;
-        const angle = step * Math.PI / 4;
-        const radius = step * 1000;
+        // Use golden angle spiral to pack users much faster and denser
+        const angle = step * 2.39996; 
+        const radius = Math.sqrt(step) * 1000;
         x = startX + Math.cos(angle) * radius;
         y = startY + Math.sin(angle) * radius;
     }
