@@ -28,7 +28,7 @@ Beneath the fun exterior lies a highly optimized, custom-built engine:
 
 - **Frontend**: Vanilla JavaScript & HTML5 Canvas API (No heavy WebGL frameworks—pure, raw 60FPS 2D rendering!)
 - **Backend Framework**: Express.js (Node.js)
-- **Spatial Engine**: Custom C++17 Engine for lightning-fast coordinate math and collision resolution
+- **Spatial Engine**: Optional C++17 native accelerator for lightning-fast coordinate math (with a seamless, deterministic JavaScript fallback)
 - **Database**: PostgreSQL (with a seamless local JSON Sandbox mode fallback)
 - **Deployment**: Railway (via Nixpacks)
 
@@ -102,9 +102,9 @@ Open [http://localhost:3000](http://localhost:3000) and prepare for liftoff!
 
 For the curious engineers, here is exactly how we generate a galaxy from code.
 
-### 1. The C++ Spatial Engine (`src/engine/`)
+### 1. The Spatial Layout Engine (`src/engine/` & `api.js`)
 
-The core of GitSpace's backend performance relies on a highly optimized C++17 engine that manages the procedural generation of islands.
+The core of GitSpace's backend performance relies on an iterative outward spiral algorithm to organically pack repositories together without overlapping. By default, this runs as a deterministic JavaScript algorithm. However, for extreme performance on large deployments, it can be accelerated using an optional custom C++17 engine.
 
 - **Contiguous Memory Arena**: The engine uses a custom `MemoryArena` allocator to prevent heap fragmentation, storing thousands of node objects sequentially in memory for extreme performance.
 - **Dynamic Quadtree Partitioning**: A `Quadtree` implementation bounds the infinite coordinate space to make searching for neighbors lightning fast.
