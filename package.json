@@ -7,9 +7,7 @@
   },
   "scripts": {
     "start": "node src/backend/server.js",
-    "migrate": "node src/backend/migrate_to_postgres.js",
     "build": "echo \"Build complete. Serving frontend via static and running Node.js.\"",
-    "seed": "node src/backend/scripts/seed.js",
     "seed:stress": "node src/backend/scripts/seed_stress.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

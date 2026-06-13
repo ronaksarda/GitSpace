@@ -13,8 +13,8 @@ if (!isSandbox) {
         process.exit(1);
     }
     if (!process.env.SESSION_SECRET) {
-        console.warn('[DB] WARNING: SESSION_SECRET is not set. Using insecure fallback for session encryption.');
-        process.env.SESSION_SECRET = 'fallback_secret_do_not_use_in_prod';
+        console.error('[DB] FATAL: SESSION_SECRET is not set. Refusing to start without secure encryption key.');
+        process.exit(1);
     }
 }
 
@@ -250,11 +250,7 @@ async function initDb() {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_repos_name_btree ON repos (name);`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_users_login_btree ON users (login);`);
 
-        // Disable Row Level Security (RLS) because all queries go through the Node backend which is trusted.
-        // RLS being enabled without policies caused all SELECTs to return 0 rows.
-        await client.query(`ALTER TABLE sessions DISABLE ROW LEVEL SECURITY;`).catch(() => {});
-        await client.query(`ALTER TABLE users DISABLE ROW LEVEL SECURITY;`).catch(() => {});
-        await client.query(`ALTER TABLE repos DISABLE ROW LEVEL SECURITY;`).catch(() => {});
+        // Row Level Security is left at Postgres defaults as requested by security audit.
 
         console.log('[DB] PostgreSQL Schema Ready. RLS Disabled.');
     } catch (err) {

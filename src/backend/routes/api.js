@@ -187,8 +187,8 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
             const sorted = [...reposData].sort((a, b) => a.name.localeCompare(b.name));
             
             const enginePath = process.platform === 'win32'
-                ? path.join(__dirname, '../../engine/gitland_engine.exe')
-                : path.join(__dirname, '../../engine/gitland_engine');
+                ? path.join(__dirname, '../../engine/gitspace_engine.exe')
+                : path.join(__dirname, '../../engine/gitspace_engine');
 
             if (!fs.existsSync(enginePath)) {
                 console.warn('[Engine] C++ engine not found, using deterministic JS layout engine');

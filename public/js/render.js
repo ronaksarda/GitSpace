@@ -628,12 +628,49 @@ function drawBuilding(b, scx, scy) {
   }
 
   // Building name label
-  if (camera.zoom > 0.7 && bw > 8) {
-    ctx.fillStyle = '#e8e8f0';
+  if ((camera.zoom > 0.4 && bw > 4) || isNear) {
     ctx.font = `${Math.max(7, 8 * camera.zoom)}px 'Space Mono', monospace`;
     ctx.textAlign = 'center';
-    const label = b.name.length > 14 ? b.name.slice(0, 12) + '..' : b.name;
-    ctx.fillText(label + (b.isFork ? ' ⑂' : ''), bsx + depth / 2, bsy - bh - depth / 2 - 10);
+    
+    let label = b.name;
+    if (label.length > 16 && !isNear) {
+      label = label.slice(0, 14) + '…';
+    }
+    const finalLabel = label + (b.isFork ? ' ⑂' : '');
+    
+    const textWidth = ctx.measureText(finalLabel).width;
+    const fontSize = Math.max(7, 8 * camera.zoom);
+    const labelX = bsx + depth / 2;
+    const labelY = bsy - bh - depth / 2 - 10;
+    
+    const padding = 2 * camera.zoom;
+    const box = {
+      x: labelX - textWidth / 2 - padding,
+      y: labelY - fontSize - padding,
+      w: textWidth + padding * 2,
+      h: fontSize + padding * 2
+    };
+
+    let hasCollision = false;
+    if (!isNear && window.drawnLabels) {
+      for (let i = 0; i < window.drawnLabels.length; i++) {
+        const other = window.drawnLabels[i];
+        if (box.x < other.x + other.w &&
+            box.x + box.w > other.x &&
+            box.y < other.y + other.h &&
+            box.y + box.h > other.y) {
+          hasCollision = true;
+          break;
+        }
+      }
+    }
+
+    if (!hasCollision || isNear) {
+      ctx.fillStyle = '#e8e8f0';
+      ctx.fillText(finalLabel, labelX, labelY);
+      if (!window.drawnLabels) window.drawnLabels = [];
+      window.drawnLabels.push(box);
+    }
   }
 }
 

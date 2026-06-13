@@ -73,16 +73,7 @@ app.use(express.static(path.join(__dirname, '../../public'), {
 // Basic JSON parser with explicit size limit
 app.use(express.json({ limit: '16kb' }));
 
-// Serve the generated MVT tile (kept for compatibility)
-app.get('/tile_0_0_0.mvt', apiLimiter, (req, res) => {
-    res.setHeader('Content-Type', 'application/vnd.mapbox-vector-tile');
-    res.sendFile(path.join(__dirname, 'tile_0_0_0.mvt'));
-});
 
-// Serve the finite world map terrain image from docs
-app.get('/terrain.png', apiLimiter, (req, res) => {
-    res.sendFile(path.join(__dirname, '../../docs', 'terrain.png'));
-});
 
 // Health check endpoint for Railway
 app.get('/health', (req, res) => {

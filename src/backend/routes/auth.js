@@ -65,16 +65,7 @@ module.exports = function(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL) {
             return res.status(400).send('Invalid state parameter format');
         }
 
-        // Fallback: If cookie is missing/invalid (e.g. localhost/127.0.0.1 mismatch),
-        // or if the user opened multiple tabs (cookie has sid from tab B, but this is tab A's callback),
-        // retrieve session by state query param.
-        if (!session || session.state !== state) {
-            console.warn('[Auth] SECURITY: Cookie session missing or state mismatch (multi-tab?) — falling back to state-only lookup.');
-            const fallbackSession = await db.getSessionByState(state);
-            if (fallbackSession && fallbackSession.state === state) {
-                session = fallbackSession;
-            }
-        }
+
 
         if (!session || session.state !== state) {
             console.error('[Auth] Invalid state. Session exists:', !!session, 'Session state:', session ? session.state : 'N/A', 'Query state:', state);

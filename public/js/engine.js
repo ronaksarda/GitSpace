@@ -113,31 +113,17 @@ function buildIsland(login, userData) {
   let maxDist = 0;
 
   const buildings = repos.map((repo, i) => {
-    let bx = repo.x;
-    let by = repo.y;
-    if (bx === undefined || bx === null || by === undefined || by === null) {
-      const angle = (i / repoCount) * Math.PI * 2 + rng(i) * 0.5;
-      const dist = baseRadius * 0.25 + rng(i + 100) * baseRadius * 0.55;
-      bx = cx + Math.cos(angle) * dist;
-      by = cy + Math.sin(angle) * dist;
-    }
-    
-    const distFromCenter = Math.sqrt(Math.pow(bx - cx, 2) + Math.pow(by - cy, 2));
+    const distFromCenter = Math.sqrt(Math.pow((repo.x || cx) - cx, 2) + Math.pow((repo.y || cy) - cy, 2));
     if (distFromCenter > maxDist) maxDist = distFromCenter;
+    
     const score = (repo.stars || 0) * 10 + Math.sqrt(repo.size || 0);
     const tier = score > 5000 ? 'skyscraper' : score > 500 ? 'tower' : score > 50 ? 'house' : 'hut';
     const height = { skyscraper: 70, tower: 45, house: 30, hut: 18 }[tier];
     const width = { skyscraper: 35, tower: 28, house: 22, hut: 15 }[tier];
+
     return {
-      x: bx, y: by,
-      name: repo.name,
+      ...repo,
       language: repo.language || 'Other',
-      stars: repo.stars || 0,
-      size: repo.size || 0,
-      url: repo.url,
-      isFork: repo.isFork,
-      description: repo.description || '',
-      updatedAt: repo.updatedAt || null,
       tier, height, width,
       color: langColor(repo.language),
       seed: rng(i + 200)
@@ -245,6 +231,7 @@ function showToast(message, duration = 2500) {
 
 // ── Main game loop ────────────────────────────────────
 function gameLoop() {
+  window.drawnLabels = [];
   ctx.fillStyle = '#030308';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
