@@ -595,7 +595,7 @@ button {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 250;
+  z-index: 100;
 }
 
 #hud>* {
@@ -953,7 +953,7 @@ button {
   top: 16px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 200;
+  z-index: 90;
   width: 300px;
 }
 
