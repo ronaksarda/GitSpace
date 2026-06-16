@@ -872,10 +872,6 @@ button {
     font-size: 10px;
   }
 
-  #search-wrap {
-    width: 200px;
-    top: 64px;
-  }
 
   #search-input {
     font-size: 10px;
@@ -2052,6 +2048,12 @@ button {
   #hud-br {
     right: 10px;
     font-size: 10px;
+  }
+
+  #search-wrap {
+    top: 80px;
+    width: 250px;
+    max-width: 90vw;
   }
 
   /* Adjust modals for mobile */
