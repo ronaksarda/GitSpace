@@ -2051,9 +2051,18 @@ button {
   }
 
   #search-wrap {
-    top: 80px;
+    top: auto;
+    bottom: 45px;
     width: 250px;
     max-width: 90vw;
+  }
+
+  #search-results {
+    top: auto;
+    bottom: 100%;
+    border-top: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
   }
 
   /* Adjust modals for mobile */
