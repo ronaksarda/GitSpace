@@ -595,7 +595,7 @@ button {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 100;
+  z-index: 250;
 }
 
 #hud>* {
@@ -791,7 +791,7 @@ button {
 }
 
 #mobile-menu-dropdown.hidden {
-  display: none;
+  display: none !important;
 }
 
 #mobile-menu-dropdown button {
@@ -874,6 +874,7 @@ button {
 
   #search-wrap {
     width: 200px;
+    top: 64px;
   }
 
   #search-input {
@@ -2027,25 +2028,18 @@ button {
   }
 
   #btn-citizens,
-  #btn-achievements {
-    font-size: 9px;
-    padding: 4px 8px;
-    margin-bottom: 4px;
-    display: block;
+  #btn-achievements,
+  #btn-sync,
+  #btn-logout,
+  #speed-control,
+  #hud-name {
+    display: none !important;
   }
 
-  #speed-control {
-    display: none;
-  }
-
-  /* Hide speed control on mobile to save space */
+  /* Hide speed control and name on mobile to save space */
   #hud-avatar {
     width: 24px;
     height: 24px;
-  }
-
-  #hud-name {
-    display: none;
   }
 
   /* Hide name on mobile to save space */
