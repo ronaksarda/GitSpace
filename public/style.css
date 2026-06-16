@@ -87,7 +87,7 @@ body {
   width: 100px;
   height: 100px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(6,182,212,0.35) 0%, rgba(6,182,212,0.1) 40%, transparent 70%);
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.35) 0%, rgba(6, 182, 212, 0.1) 40%, transparent 70%);
   filter: blur(15px);
   z-index: 0;
   animation: logoGlow 3s ease-in-out infinite;
@@ -97,12 +97,21 @@ body {
   position: relative;
   z-index: 1;
   mix-blend-mode: lighten;
-  filter: drop-shadow(0 0 8px rgba(6,182,212,0.5));
+  filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.5));
 }
 
 @keyframes logoGlow {
-  0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
-  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
+
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.15);
+  }
 }
 
 @keyframes pulse {
@@ -255,7 +264,7 @@ button {
   width: 100px;
   height: 100px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(6,182,212,0.3) 0%, rgba(6,182,212,0.08) 40%, transparent 70%);
+  background: radial-gradient(circle, rgba(6, 182, 212, 0.3) 0%, rgba(6, 182, 212, 0.08) 40%, transparent 70%);
   filter: blur(18px);
   z-index: 0;
   animation: logoGlow 3s ease-in-out infinite;
@@ -265,7 +274,7 @@ button {
   position: relative;
   z-index: 1;
   mix-blend-mode: lighten;
-  filter: drop-shadow(0 0 10px rgba(6,182,212,0.5));
+  filter: drop-shadow(0 0 10px rgba(6, 182, 212, 0.5));
 }
 
 .login-inner h1 {
@@ -852,7 +861,7 @@ button {
     left: 12px;
     font-size: 10px;
   }
-  
+
   #hud-coords {
     display: none;
   }
@@ -886,7 +895,8 @@ button {
     font-size: 11px !important;
   }
 
-  #citizens-sidebar, #achievements-sidebar {
+  #citizens-sidebar,
+  #achievements-sidebar {
     width: 100vw;
   }
 
@@ -1996,20 +2006,65 @@ button {
 
 /* ── Mobile Responsiveness ────────────────────────────── */
 @media (max-width: 768px) {
-  #hud-tl { top: 10px; left: 10px; }
-  #hud-tr { top: 10px; right: 10px; padding: 6px 10px; }
-  .hud-logo { font-size: 14px; letter-spacing: 2px; }
-  .hud-version { margin-bottom: 6px; }
-  #btn-citizens, #btn-achievements { font-size: 9px; padding: 4px 8px; margin-bottom: 4px; display: block; }
-  #speed-control { display: none; } /* Hide speed control on mobile to save space */
-  #hud-avatar { width: 24px; height: 24px; }
-  #hud-name { display: none; } /* Hide name on mobile to save space */
-  
-  #hud-bl { left: 10px; font-size: 10px; }
-  #hud-br { right: 10px; font-size: 10px; }
+  #hud-tl {
+    top: 10px;
+    left: 10px;
+  }
+
+  #hud-tr {
+    top: 10px;
+    right: 10px;
+    padding: 6px 10px;
+  }
+
+  .hud-logo {
+    font-size: 14px;
+    letter-spacing: 2px;
+  }
+
+  .hud-version {
+    margin-bottom: 6px;
+  }
+
+  #btn-citizens,
+  #btn-achievements {
+    font-size: 9px;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    display: block;
+  }
+
+  #speed-control {
+    display: none;
+  }
+
+  /* Hide speed control on mobile to save space */
+  #hud-avatar {
+    width: 24px;
+    height: 24px;
+  }
+
+  #hud-name {
+    display: none;
+  }
+
+  /* Hide name on mobile to save space */
+
+  #hud-bl {
+    left: 10px;
+    font-size: 10px;
+  }
+
+  #hud-br {
+    right: 10px;
+    font-size: 10px;
+  }
 
   /* Adjust modals for mobile */
-  .rm-inner, .pm-inner, .cb-inner, .ach-inner {
+  .rm-inner,
+  .pm-inner,
+  .cb-inner,
+  .ach-inner {
     padding: 20px;
     width: 95%;
   }
