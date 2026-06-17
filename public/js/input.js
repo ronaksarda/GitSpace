@@ -448,7 +448,7 @@ canvas.addEventListener('touchstart', e => {
     window.isDragging = false;
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
-    initialPinchDistance = Math.sqrt(dx * dx + dy * dy);
+    initialPinchDistance = Math.max(1, Math.sqrt(dx * dx + dy * dy));
     initialZoom = camera.zoom;
   }
 }, { passive: false });
@@ -474,12 +474,12 @@ canvas.addEventListener('touchmove', e => {
         const newDy = touch.clientY - window.touchJoystick.originY;
         const newDist = Math.sqrt(newDx * newDx + newDy * newDy);
         window.touchJoystick.dist = newDist;
-        window.touchJoystick.moveX = newDx / newDist;
-        window.touchJoystick.moveY = newDy / newDist;
+        window.touchJoystick.moveX = newDist > 0 ? newDx / newDist : 0;
+        window.touchJoystick.moveY = newDist > 0 ? newDy / newDist : 0;
       } else {
         window.touchJoystick.dist = dist;
-        window.touchJoystick.moveX = dx / dist;
-        window.touchJoystick.moveY = dy / dist;
+        window.touchJoystick.moveX = dist > 0 ? dx / dist : 0;
+        window.touchJoystick.moveY = dist > 0 ? dy / dist : 0;
       }
     }
 

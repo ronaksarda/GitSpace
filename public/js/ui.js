@@ -41,6 +41,7 @@ searchInput.addEventListener('input', () => {
 window.flyTo = function (x, y, jsonStr) {
   let item = null;
   try { if (jsonStr) item = JSON.parse(jsonStr); } catch (e) { }
+  if (isNaN(x) || isNaN(y)) { x = 0; y = 0; }
   autopilotTarget = { x, y, item };
   searchResults.innerHTML = '';
   searchInput.value = '';
