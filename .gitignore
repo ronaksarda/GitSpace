@@ -19,6 +19,7 @@ src/backend/sandbox_db.json
 # C++ Build artifacts
 src/engine/*.o
 src/engine/*.out
+src/engine/*.exe
 
 # Logs
 logs

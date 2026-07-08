@@ -614,13 +614,16 @@ button {
   letter-spacing: 4px;
   color: var(--cyan);
   font-family: var(--font-sans);
+  line-height: 1.2;
 }
 
 .hud-version {
   font-size: 9px;
   color: var(--text-dim);
   letter-spacing: .2em;
+  margin-top: 8px;
   margin-bottom: 12px;
+  line-height: 1.2;
 }
 
 #btn-citizens {
@@ -2009,18 +2012,43 @@ button {
   }
 
   #hud-tr {
-    top: 10px;
-    right: 10px;
-    padding: 6px 10px;
+    top: 10px !important;
+    right: 10px !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
+  }
+
+  #hud-tr > * {
+    pointer-events: auto !important;
+  }
+
+  #btn-mobile-menu {
+    display: inline-block !important;
+    background: var(--bg-panel) !important;
+    border: 1px solid var(--border) !important;
+    backdrop-filter: blur(12px) !important;
+    margin-left: 6px !important;
+  }
+
+  #mobile-menu-dropdown {
+    top: 50px !important;
+    right: 10px !important;
   }
 
   .hud-logo {
     font-size: 14px;
     letter-spacing: 2px;
+    line-height: 1.2;
   }
 
   .hud-version {
+    margin-top: 6px;
     margin-bottom: 6px;
+    line-height: 1.2;
   }
 
   #btn-citizens,
@@ -2034,8 +2062,8 @@ button {
 
   /* Hide speed control and name on mobile to save space */
   #hud-avatar {
-    width: 24px;
-    height: 24px;
+    width: 24px !important;
+    height: 24px !important;
   }
 
   /* Hide name on mobile to save space */
@@ -2051,18 +2079,21 @@ button {
   }
 
   #search-wrap {
-    top: auto;
-    bottom: 45px;
-    width: 250px;
-    max-width: 90vw;
+    position: absolute !important;
+    top: 55px !important;
+    bottom: auto !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 90% !important;
+    max-width: 320px !important;
   }
 
   #search-results {
-    top: auto;
-    bottom: 100%;
-    border-top: 1px solid var(--border);
-    border-bottom: none;
-    border-radius: 6px 6px 0 0;
+    top: 100% !important;
+    bottom: auto !important;
+    border-top: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    border-radius: 0 0 6px 6px !important;
   }
 
   /* Adjust modals for mobile */
