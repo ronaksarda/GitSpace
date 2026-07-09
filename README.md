@@ -2,7 +2,7 @@
   <img src="public/logo.png" alt="GitSpace Logo" width="200"/>
   <h1>🌌 GitSpace: The GitHub Universe 🚀</h1>
   <p><strong>Your GitHub repositories are a world. Every repo is a building. Every developer is an island.</strong></p>
-  <h3>🌐 Play Live: <a href="https://gitspace.up.railway.app">https://gitspace.up.railway.app</a></h3>
+  <h3>🌐 Play Live: <a href="https://gitspace.me">https://gitspace.me</a></h3>
 </div>
 
 Welcome to **GitSpace**—a gamified, massively multiplayer 2D universe that transforms the world of open-source into a sprawling, explorable galaxy. Say goodbye to scrolling through endless lists of repositories. Instead, strap into your ship, fire up the warp drive, and physically *fly* through the open-source ecosystem. 
@@ -30,7 +30,7 @@ Beneath the fun exterior lies a highly optimized, custom-built engine:
 - **Backend Framework**: Express.js (Node.js)
 - **Spatial Engine**: Optional C++17 native accelerator for lightning-fast coordinate math (with a seamless, deterministic JavaScript fallback)
 - **Database**: PostgreSQL (with a seamless local JSON Sandbox mode fallback)
-- **Deployment**: Railway (via Nixpacks)
+- **Deployment**: Render (via Nixpacks)
 
 ---
 
