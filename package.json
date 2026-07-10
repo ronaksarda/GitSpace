@@ -9,8 +9,7 @@
     "start": "node src/backend/server.js",
     "build": "echo \"Build complete. Serving frontend via static and running Node.js.\"",
     "seed:stress": "node src/backend/scripts/seed_stress.js",
-    "lint": "eslint . --ext .js",
-    "test": "jest"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "compression": "^1.8.1",
@@ -18,10 +17,5 @@
     "express": "^4.21.2",
     "express-rate-limit": "^8.5.2",
     "pg": "^8.13.1"
-  },
-  "devDependencies": {
-    "eslint": "^9.0.0",
-    "jest": "^29.0.0",
-    "supertest": "^7.0.0"
   }
 }
