@@ -6,8 +6,11 @@
 </div>
 
 Welcome to **GitSpace**—a gamified, massively multiplayer 2D universe that transforms the world of open-source into a sprawling, explorable galaxy. Say goodbye to scrolling through endless lists of repositories. Instead, strap into your ship, fire up the warp drive, and physically *fly* through the open-source ecosystem. 
-
 Whether you're visiting your own island or discovering new citizens of the galaxy, GitSpace makes exploring code a beautiful, immersive adventure!
+
+
+![GitSpace demo](./readme_demo.gif)
+
 
 ---
 
