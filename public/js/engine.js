@@ -133,13 +133,18 @@ function buildIsland(login, userData) {
   // Pre-sort buildings by Y coordinate for correct rendering depth
   buildings.sort((a, b) => a.y - b.y);
 
-  // Clamp island spread — scale buildings down if they extend too far
+  // Clamp island spread — sqrt compression brings outliers in without crushing center
   const MAX_SPREAD = 500;
   if (maxDist > MAX_SPREAD) {
-    const sf = MAX_SPREAD / maxDist;
     for (const b of buildings) {
-      b.x = cx + (b.x - cx) * sf;
-      b.y = cy + (b.y - cy) * sf;
+      const dx = b.x - cx;
+      const dy = b.y - cy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 0) {
+        const compressed = MAX_SPREAD * Math.sqrt(dist / maxDist);
+        b.x = cx + dx * (compressed / dist);
+        b.y = cy + dy * (compressed / dist);
+      }
     }
     maxDist = MAX_SPREAD;
   }
