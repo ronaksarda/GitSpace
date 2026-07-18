@@ -134,7 +134,7 @@ function buildIsland(login, userData) {
   buildings.sort((a, b) => a.y - b.y);
 
   // Clamp island spread — scale buildings down if they extend too far
-  const MAX_SPREAD = 280;
+  const MAX_SPREAD = 500;
   if (maxDist > MAX_SPREAD) {
     const sf = MAX_SPREAD / maxDist;
     for (const b of buildings) {
