@@ -133,6 +133,17 @@ function buildIsland(login, userData) {
   // Pre-sort buildings by Y coordinate for correct rendering depth
   buildings.sort((a, b) => a.y - b.y);
 
+  // Clamp island spread — scale buildings down if they extend too far
+  const MAX_SPREAD = 280;
+  if (maxDist > MAX_SPREAD) {
+    const sf = MAX_SPREAD / maxDist;
+    for (const b of buildings) {
+      b.x = cx + (b.x - cx) * sf;
+      b.y = cy + (b.y - cy) * sf;
+    }
+    maxDist = MAX_SPREAD;
+  }
+
   const islandRadius = Math.max(120, maxDist + 60);
 
   const img = new Image();

@@ -168,7 +168,7 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
             placed.push(proj);
         }
 
-        const scale = 8.0;
+        const scale = 3.5;
         const scaledPlaced = placed.map(p => {
             const dx = p.x - baseX;
             const dy = p.y - baseY;
@@ -239,7 +239,7 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                     }
                     try {
                         const result = JSON.parse(out);
-                        const scale = 8.0;
+                        const scale = 3.5;
                         const reposWithMeta = result.map((p, idx) => {
                             const original = sorted[idx] || {};
                             const dx = p.x - baseX;
