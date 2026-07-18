@@ -116,7 +116,7 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
             if (["C++", "Rust", "C", "Go", "Java", "C#"].includes(language)) {
                 radius = 6.0 + Math.sqrt(stars) * 0.16 + Math.sqrt(size) * 0.05;
             } else {
-                radius = 3.0 + Math.sqrt(stars) * 0.10 + Math.sqrt(size) * 0.03;'
+                radius = 3.0 + Math.sqrt(stars) * 0.10 + Math.sqrt(size) * 0.03;
                     radius = Math.min(18.0, radius);
             }
 
