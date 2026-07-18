@@ -109,6 +109,7 @@ public:
     void computeLandMass() override {
         // Framework components get a slightly larger footprint for stability mapping.
         radius = 6.0 + std::sqrt(static_cast<double>(stars)) * 0.16 + std::sqrt(static_cast<double>(size)) * 0.05;
+         if (radius > 18.0) radius = 18.0;
     }
 };
 
@@ -122,6 +123,7 @@ public:
     void computeLandMass() override {
         // Script components get a slightly smaller footprint.
         radius = 3.0 + std::sqrt(static_cast<double>(stars)) * 0.10 + std::sqrt(static_cast<double>(size)) * 0.03;
+         if (radius > 18.0) radius = 18.0;
     }
 };
 
