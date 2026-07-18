@@ -255,7 +255,7 @@ public:
                 double dx = proj->x - other->x;
                 double dy = proj->y - other->y;
                 double dist = std::sqrt(dx * dx + dy * dy);
-                double minDist = proj->radius + other->radius + 1.5;
+                double minDist = proj->radius + other->radius + 5.0;
                 if (dist < minDist) {
                     has_collision = true;
                     break;

@@ -134,7 +134,7 @@ function buildIsland(login, userData) {
   buildings.sort((a, b) => a.y - b.y);
 
   // Clamp island spread — sqrt compression brings outliers in without crushing center
-  const MAX_SPREAD = 500;
+  const MAX_SPREAD = 800;
   if (maxDist > MAX_SPREAD) {
     for (const b of buildings) {
       const dx = b.x - cx;

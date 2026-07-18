@@ -150,7 +150,7 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                     const dx = proj.x - other.x;
                     const dy = proj.y - other.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
-                    const minDist = proj.radius + other.radius + 1.5;
+                    const minDist = proj.radius + other.radius + 5.0;
                     if (dist < minDist) {
                         has_collision = true;
                         break;
