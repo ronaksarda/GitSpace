@@ -173,8 +173,3 @@ User Action (Browser Canvas)
 **Error:** `redirect_uri_mismatch` from GitHub.
 **Solution:** Ensure the `Authorization callback URL` in your GitHub OAuth App settings matches your `APP_URL` + `/auth/callback` (e.g., `http://localhost:3000/auth/callback`).
 
----
-
-## 📄 License
-
-This project is licensed under the MIT License. Fly safe, Explorer! 🛸
