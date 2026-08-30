@@ -8,7 +8,6 @@ const router = express.Router();
 let activeEngineProcesses = 0;
 const MAX_ENGINE_PROCESSES = 4;
 
-// In-memory GitHub API cache — 5 minute TTL per username
 const githubCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
@@ -24,7 +23,6 @@ function getCached(key) {
 
 function setCache(key, data) {
     githubCache.set(key, { data, ts: Date.now() });
-    // Prevent unbounded growth — evict oldest if over 500 entries
     if (githubCache.size > 500) {
         const oldest = githubCache.keys().next().value;
         githubCache.delete(oldest);
@@ -68,7 +66,6 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
         }
     }
 
-    // API: Get authenticated user profile
     router.get('/api/me', async (req, res) => {
         try {
             const session = await getSession(req);
@@ -76,7 +73,6 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 return res.json({ authenticated: false });
             }
 
-            // Mock response for local development without credentials
             if (session.token === 'mock_token') {
                 const mockLogin = process.env.MOCK_USER_LOGIN || 'mock_user';
                 return res.json({ login: mockLogin, avatar_url: `https://avatars.githubusercontent.com/${mockLogin}`, authenticated: true });
@@ -99,7 +95,6 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
         }
     });
 
-    // Generate Layout - no absolute coordinates, rely on frontend deterministic renderer
     function generateLayoutJS(reposData, baseX, baseY) {
         const sorted = [...reposData].sort((a, b) => a.name.localeCompare(b.name));
         const repos = sorted.map(r => {
@@ -191,7 +186,6 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
         task();
     }
 
-    // Generate Layout using C++ Engine with identical Javascript-based fallback
     function generateLayoutEngine(username, reposData, baseX, baseY) {
         return new Promise((resolve) => {
             const sorted = [...reposData].sort((a, b) => a.name.localeCompare(b.name));
@@ -310,7 +304,6 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 userData = await uRes.json();
             }
 
-            // If it's a GET request, try to load from DB first
             if (req.method === 'GET') {
                 const existingUser = await db.getUser(userData.login);
                 if (existingUser) {
@@ -321,7 +314,6 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 }
             }
 
-            // If POST (sync) or not found in DB, fetch from GitHub
             let reposData;
             if (req.session.token === 'mock_token') {
                 reposData = [
@@ -330,7 +322,6 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                     { name: 'mock-repo-3', language: 'C++', size: 35000, stargazers_count: 120, html_url: '#', fork: false, description: 'High-performance spatial engine', updated_at: new Date(Date.now() - 86400000 * 7).toISOString() },
                 ];
             } else {
-                // Check cache before hitting GitHub API
                 const cacheKey = `repos:${userData.login}`;
                 const cached = getCached(cacheKey);
                 if (cached && req.method === 'GET') {
@@ -349,7 +340,6 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 }
             }
 
-            // Check if user already exists to keep coordinates stable
             const existingUser = await db.getUser(userData.login);
             let baseX, baseY;
             if (existingUser && existingUser.cx !== undefined && existingUser.cx !== null && existingUser.cy !== undefined && existingUser.cy !== null) {
@@ -402,11 +392,10 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
         }
     });
 
-    // Fetch directory of citizens
     router.get('/api/citizens', heavyLimiter || ((req, res, next) => next()), async (req, res) => {
         try {
             const limit = Math.min(parseInt(req.query.limit) || 50, 100);
-            const offset = Math.min(parseInt(req.query.offset) || 0, 10000); // Prevent offset exhaustion DoS
+            const offset = Math.min(parseInt(req.query.offset) || 0, 10000);
             const list = await db.getCitizens(limit, offset);
             res.json(list);
         } catch (err) {

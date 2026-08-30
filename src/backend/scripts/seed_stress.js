@@ -42,20 +42,17 @@ async function seed() {
         console.log(`[Seed] Generating ${NUM_USERS} users...`);
         const users = [];
         
-        // Arrange users in a massive jittered grid
         const cols = Math.ceil(Math.sqrt(NUM_USERS));
-        const cellSpacing = 8000; // 8000x8000 cell size
+        const cellSpacing = 8000;
         const offset = (cols * cellSpacing) / 2;
 
         for (let i = 0; i < NUM_USERS; i++) {
             const col = i % cols;
             const row = Math.floor(i / cols);
             
-            // Base center of the cell
             const baseX = (col * cellSpacing) - offset;
             const baseY = (row * cellSpacing) - offset;
             
-            // Add a random jitter within the cell (ensures at least 2000 units of padding from cell borders)
             const jitterX = (Math.random() - 0.5) * (cellSpacing - 4000);
             const jitterY = (Math.random() - 0.5) * (cellSpacing - 4000);
 
@@ -65,10 +62,9 @@ async function seed() {
             let login = `stress_user_${i}`;
             let avatar = `https://avatars.githubusercontent.com/u/${i}?v=4`;
             
-            // Edge cases for user logins
-            if (i === 10) login = '<script>alert("xss")</script>'; // HTML injection
-            if (i === 20) login = 'A'.repeat(200); // Extremely long name
-            if (i === 30) login = 'emoji_👨‍💻_🚀'; // Unicode
+            if (i === 10) login = '<script>alert("xss")</script>';
+            if (i === 20) login = 'A'.repeat(200);
+            if (i === 30) login = 'emoji_👨‍💻_🚀';
             
             users.push({
                 login,
@@ -81,7 +77,6 @@ async function seed() {
             });
         }
 
-        // Insert users in chunks
         console.log('[Seed] Inserting users...');
         for (let i = 0; i < users.length; i += BATCH_SIZE) {
             const batch = users.slice(i, i + BATCH_SIZE);
@@ -115,17 +110,14 @@ async function seed() {
                 let language = ['JavaScript', 'TypeScript', 'HTML', 'CSS', null, 'Unknown'][r % 6];
                 let description = `Test repository ${r} for ${user.login}`;
 
-                // Edge Cases
-                if (r === 0) { stars = 15000; size = 150000; name = "Skyscraper_Max"; } // Skyscraper
-                if (r === 1) { stars = 0; size = 10; name = "Tiny_Hut"; } // Smallest possible
-                if (r === 2) { name = "B".repeat(200); } // Insanely long name
-                if (r === 3) { description = "<img src=x onerror=alert(1)>"; } // HTML in description
-                if (r === 4) { isFork = true; size = 9999999; } // Massive fork
+                if (r === 0) { stars = 15000; size = 150000; name = "Skyscraper_Max"; }
+                if (r === 1) { stars = 0; size = 10; name = "Tiny_Hut"; }
+                if (r === 2) { name = "B".repeat(200); }
+                if (r === 3) { description = "<img src=x onerror=alert(1)>"; }
+                if (r === 4) { isFork = true; size = 9999999; }
 
-                // Layout Math
                 const layoutAngle = (r / REPOS_PER_USER) * Math.PI * 2;
-                // Add some spiral or multiple rings for 80 repos so they don't overlap completely
-                const ring = Math.floor(r / 20) + 1; // 4 rings of 20 repos
+                const ring = Math.floor(r / 20) + 1;
                 const rDist = 150 * ring + (Math.random() * 50);
                 
                 const x = user.cx + Math.cos(layoutAngle) * rDist;
@@ -156,7 +148,6 @@ async function seed() {
             }
         }
         
-        // Insert remaining
         if (reposBatch.length > 0) {
             await insertRepos(client, reposBatch);
             totalReposInserted += reposBatch.length;

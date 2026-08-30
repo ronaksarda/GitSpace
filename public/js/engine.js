@@ -1,7 +1,3 @@
-// ══════════════════════════════════════════════════════
-// GITSPACE — Canvas 2D Game Engine v2.0
-// ══════════════════════════════════════════════════════
-
 const canvas = document.getElementById('world');
 const ctx = canvas.getContext('2d', { alpha: false });
 canvas.width = window.innerWidth;
@@ -9,16 +5,13 @@ canvas.height = window.innerHeight;
 
 const isMobile = () => window.innerWidth < 768;
 
-// Global nearest island state set by checkProximity
 let nearestIsland = null;
 let nearestDist = Infinity;
 
-// Collision Helper
 function isValidPosition(x, y) {
   return true;
 }
 
-// World state
 let worldData = { totalUsers: 0, totalRepos: 0 };
 let currentUser = null;
 let islands = [];
@@ -36,7 +29,6 @@ let lastMouse = { x: 0, y: 0 };
 let warpActive = false;
 let warpProgress = 0;
 
-// ── Language colours ──────────────────────────────────
 const LANG_COLORS = {
   'JavaScript': '#f1e05a', 'TypeScript': '#3178c6',
   'Python': '#3572A5', 'C++': '#f34b7d', 'C': '#555555',
@@ -49,7 +41,6 @@ const LANG_COLORS = {
 };
 function langColor(l) { return LANG_COLORS[l] || LANG_COLORS.Other; }
 
-// ── Resize ────────────────────────────────────────────
 function resize() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -57,7 +48,6 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// ── Generate stars (more for depth) ───────────────────
 let stars = [];
 function genStars(count = 900) {
   stars = [];
@@ -73,7 +63,6 @@ function genStars(count = 900) {
 }
 genStars();
 
-// ── Badge calculator (Feature 8) ─────────────────────
 function calculateBadges(repos) {
   const badges = [];
   const totalStars = repos.reduce((sum, r) => sum + (r.stars || 0), 0);
@@ -99,7 +88,6 @@ function calculateBadges(repos) {
   return badges;
 }
 
-// ── Island builder ────────────────────────────────────
 function buildIsland(login, userData) {
   const { cx, cy, avatar, primaryLanguage, repos, isActive } = userData;
   const color = langColor(primaryLanguage);
@@ -229,9 +217,8 @@ window.initDistance = function (username) {
   distanceKey = 'gitspace_distance_' + (username || 'guest');
   totalDistanceTravelled = parseFloat(localStorage.getItem(distanceKey) || '0');
 };
-window.initDistance('guest'); // default fallback before login
+window.initDistance('guest');
 
-// ── Toast notification system ─────────────────────────
 function showToast(message, duration = 2500) {
   const toast = document.getElementById('toast-notification');
   if (!toast) return;
@@ -245,7 +232,6 @@ function showToast(message, duration = 2500) {
   }, duration);
 }
 
-// ── Main game loop ────────────────────────────────────
 function gameLoop() {
   window.drawnLabels = [];
   ctx.fillStyle = '#030308';
@@ -305,16 +291,14 @@ function gameLoop() {
     }
   }
 
-  // Auto-Pilot with Warp Drive (Feature 5)
+  // Autopilot navigation
   if (autopilotTarget) {
     const dx = autopilotTarget.x - player.x;
     const dy = autopilotTarget.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Stop early to prevent clipping into buildings/islands
     const stoppingDistance = autopilotTarget.item ? (autopilotTarget.item.type === 'repo' ? 80 : 150) : 5;
 
-    // Activate warp for long distances
     if (dist > 5000 && !warpActive) {
       warpActive = true;
       warpProgress = 0;

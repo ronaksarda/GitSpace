@@ -6,14 +6,9 @@
 #include <cstring>
 #include <algorithm>
 
-/**
- * @brief Utility for low-level Protocol Buffer byte serialization.
- */
+// Low-level protobuf wire encoder for MVT
 class MvtWriter {
 public:
-    /**
-     * @brief Encodes a 64-bit unsigned integer into a variable-length byte sequence.
-     */
     static void writeVarint(std::vector<uint8_t>& buf, uint64_t val) {
         while (val >= 0x80) {
             buf.push_back(static_cast<uint8_t>((val & 0x7F) | 0x80));
@@ -22,9 +17,6 @@ public:
         buf.push_back(static_cast<uint8_t>(val & 0x7F));
     }
 
-    /**
-     * @brief Writes a little-endian float value (wire type 5).
-     */
     static void writeFloat(std::vector<uint8_t>& buf, float val) {
         uint32_t bits;
         std::memcpy(&bits, &val, 4);
@@ -34,9 +26,6 @@ public:
         buf.push_back(static_cast<uint8_t>((bits >> 24) & 0xFF));
     }
 
-    /**
-     * @brief Writes a little-endian double value (wire type 1).
-     */
     static void writeDouble(std::vector<uint8_t>& buf, double val) {
         uint64_t bits;
         std::memcpy(&bits, &val, 8);
@@ -50,36 +39,25 @@ public:
         buf.push_back(static_cast<uint8_t>((bits >> 56) & 0xFF));
     }
 
-    /**
-     * @brief Writes a length-delimited string field (wire type 2).
-     */
     static void writeStringField(std::vector<uint8_t>& buf, uint32_t field_num, const std::string& str) {
         writeVarint(buf, (field_num << 3) | 2);
         writeVarint(buf, str.size());
         buf.insert(buf.end(), str.begin(), str.end());
     }
 
-    /**
-     * @brief Writes a length-delimited nested message field (wire type 2).
-     */
     static void writeMessageField(std::vector<uint8_t>& buf, uint32_t field_num, const std::vector<uint8_t>& sub_buf) {
         writeVarint(buf, (field_num << 3) | 2);
         writeVarint(buf, sub_buf.size());
         buf.insert(buf.end(), sub_buf.begin(), sub_buf.end());
     }
 
-    /**
-     * @brief Writes a varint field (wire type 0).
-     */
     static void writeVarintField(std::vector<uint8_t>& buf, uint32_t field_num, uint64_t val) {
         writeVarint(buf, (field_num << 3) | 0);
         writeVarint(buf, val);
     }
 };
 
-/**
- * @brief Dynamic Value variant class mapping to the MVT protobuf Value message schema.
- */
+// Protobuf property value variant
 struct PropertyValue {
     enum Type { STRING, FLOAT, DOUBLE, INT, UINT, BOOL };
     Type type;
@@ -127,9 +105,6 @@ struct PropertyValue {
         return v;
     }
 
-    /**
-     * @brief Serializes the Value variant according to its protobuf tag types.
-     */
     std::vector<uint8_t> serialize() const {
         std::vector<uint8_t> buf;
         if (type == STRING) {
@@ -164,27 +139,22 @@ struct PropertyValue {
     }
 };
 
-/**
- * @brief Represents an individual feature in Mapbox Vector Tile format.
- */
+// Map feature with tags and point geometry
 struct MvtFeature {
     uint64_t id = 0;
     std::vector<std::pair<std::string, PropertyValue>> attributes;
     int32_t x = 0;
     int32_t y = 0;
 
-    /**
-     * @brief Encodes the feature and compiles tag dictionary offsets.
-     */
     std::vector<uint8_t> serialize(const std::vector<std::string>& keys, const std::vector<PropertyValue>& values) const {
         std::vector<uint8_t> buf;
 
-        // 1. ID
+        // ID
         if (id != 0) {
             MvtWriter::writeVarintField(buf, 1, id);
         }
 
-        // 2. Tags (key-value index references)
+        // Tag index pairs
         std::vector<uint8_t> tags_buf;
         for (const auto& attr : attributes) {
             auto k_it = std::find(keys.begin(), keys.end(), attr.first);
@@ -206,10 +176,10 @@ struct MvtFeature {
             MvtWriter::writeMessageField(buf, 2, tags_buf);
         }
 
-        // 3. Geometry Type: POINT = 1
+        // Geometry: Point
         MvtWriter::writeVarintField(buf, 3, 1);
 
-        // 4. Geometry Commands: MoveTo(1) command. CommandInteger = 9
+        // MoveTo command + zigzag delta
         std::vector<uint8_t> geom_buf;
         MvtWriter::writeVarint(geom_buf, 9); // MoveTo, count 1
 
@@ -227,17 +197,12 @@ struct MvtFeature {
     }
 };
 
-/**
- * @brief Represents a single map layer holding multiple vector features.
- */
+// Map layer with dictionary tables
 struct MvtLayer {
     std::string name;
     uint32_t extent = 4096;
     std::vector<MvtFeature> features;
 
-    /**
-     * @brief Consolidates unique keys and values, then serializes the MVT layer.
-     */
     std::vector<uint8_t> serialize() const {
         std::vector<std::string> keys;
         std::vector<PropertyValue> values;
@@ -255,45 +220,40 @@ struct MvtLayer {
 
         std::vector<uint8_t> buf;
 
-        // 15. Version (MVT v2.1)
+        // Version (MVT 2.1)
         MvtWriter::writeVarintField(buf, 15, 2);
 
-        // 1. Layer Name
+        // Layer name
         MvtWriter::writeStringField(buf, 1, name);
 
-        // 2. Features
+        // Features
         for (const auto& feat : features) {
             std::vector<uint8_t> feat_buf = feat.serialize(keys, values);
             MvtWriter::writeMessageField(buf, 2, feat_buf);
         }
 
-        // 3. String Keys Dictionary
+        // Keys dictionary
         for (const auto& key : keys) {
             MvtWriter::writeStringField(buf, 3, key);
         }
 
-        // 4. Value Dictionary
+        // Values dictionary
         for (const auto& val : values) {
             std::vector<uint8_t> val_buf = val.serialize();
             MvtWriter::writeMessageField(buf, 4, val_buf);
         }
 
-        // 5. Extent dimensions
+        // Extent
         MvtWriter::writeVarintField(buf, 5, extent);
 
         return buf;
     }
 };
 
-/**
- * @brief Top-level Vector Tile container message.
- */
+// Root tile container
 struct MvtTile {
     std::vector<MvtLayer> layers;
 
-    /**
-     * @brief Compiles the complete static tile payload.
-     */
     std::vector<uint8_t> serialize() const {
         std::vector<uint8_t> buf;
         for (const auto& layer : layers) {

@@ -1,4 +1,3 @@
-// ── Global Error Boundary (Feature 14) ────────────────
 window.onerror = function(msg, src, line, col, err) {
   const errorScreen = document.getElementById('error-screen');
   if (errorScreen) {
@@ -12,7 +11,6 @@ window.addEventListener('unhandledrejection', event => {
   console.error('Unhandled promise rejection:', event.reason);
 });
 
-// ── Load world data and start ─────────────────────────
 async function init() {
   const loadFill = document.getElementById('loadfill');
   const loading = document.getElementById('loading');
@@ -42,7 +40,6 @@ async function init() {
 
     loadFill.style.width = '80%';
 
-    // Fetch exact spawn point
     try {
       const spawnRes = await fetch('/api/spawn');
       const spawnData = await spawnRes.json();
@@ -52,7 +49,6 @@ async function init() {
       camera.y = player.y;
     } catch (e) { }
 
-    // Start with center chunk
     await checkChunks();
 
     loadFill.style.width = '100%';
@@ -87,13 +83,11 @@ async function init() {
           hud.style.display = 'none';
           loginScreen.classList.remove('hidden');
         } else if (repoData.success && repoData.repos && window.unlockAchievement) {
-          // Spawn player at their island
           player.x = repoData.cx;
           player.y = repoData.cy;
           camera.x = player.x;
           camera.y = player.y;
 
-          // Evaluate Personal Milestones based on real GitHub data
           const myRepos = repoData.repos;
           const langs = {};
           let maxLangCount = 0;
@@ -119,10 +113,8 @@ async function init() {
           if (typeof loadedChunks !== 'undefined') loadedChunks.clear();
           if (typeof islands !== 'undefined') islands.length = 0;
           
-          // Refresh stats now that our island is in the database!
           updateStats();
         } else if (repoData.success) {
-          // No repos but still logged in - spawn at island
           player.x = repoData.cx;
           player.y = repoData.cy;
           camera.x = player.x;
@@ -131,7 +123,6 @@ async function init() {
           if (typeof loadedChunks !== 'undefined') loadedChunks.clear();
           if (typeof islands !== 'undefined') islands.length = 0;
           
-          // Refresh stats
           updateStats();
         }
       } catch (e) {
@@ -140,7 +131,6 @@ async function init() {
 
       currentUser = user;
 
-      // Init onboarding tour after everything is loaded and authenticated
       if (typeof initTour === 'function') {
         initTour();
       }
@@ -150,7 +140,6 @@ async function init() {
       if (window.initDistance) window.initDistance('guest');
     }
 
-    // Handle ?fly= param
     const params = new URLSearchParams(window.location.search);
     const flyToLogin = params.get('fly');
     if (flyToLogin) {
@@ -171,9 +160,7 @@ async function init() {
       } catch (e) { }
     }
 
-    // Poll stats every 30 seconds to keep live count updated
     setInterval(updateStats, 30000);
-
     gameLoop();
 
   } catch (fatalError) {

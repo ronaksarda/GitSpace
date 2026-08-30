@@ -3,7 +3,6 @@ const crypto = require('crypto');
 const router = express.Router();
 
 module.exports = function(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL) {
-    // Dynamic secure flag: only use Secure if the application is accessed over HTTPS
     const isSecure = CALLBACK_URL && CALLBACK_URL.startsWith('https://');
     const cookieFlags = `HttpOnly; Path=/; SameSite=Lax; Max-Age=86400${isSecure ? '; Secure' : ''}`;
 
@@ -27,13 +26,13 @@ module.exports = function(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL) {
 
     // Step 1: Redirect to GitHub
     router.get('/auth/github', async (req, res) => {
-        // If no real Github credentials, simulate login for local testing (non-production only)
+        // Dev mock fallback when credentials are missing
         if (!CLIENT_ID || CLIENT_ID.trim() === '') {
             if (process.env.NODE_ENV === 'production') {
-                console.error('[Auth] GitHub CLIENT_ID is missing. Refusing mock login in production.');
+                console.error('[Auth] GitHub CLIENT_ID missing in production.');
                 return res.status(500).send('Authentication setup failed: GITHUB_CLIENT_ID not set');
             }
-            console.log('[Auth] Mocking GitHub login because no CLIENT_ID is set.');
+            console.log('[Auth] Mocking GitHub login (no CLIENT_ID set).');
             const newSid = crypto.randomBytes(32).toString('hex');
             await db.createSession(newSid, null, 'mock_token');
             setSessionCookie(res, newSid);
@@ -53,19 +52,15 @@ module.exports = function(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL) {
         }
     });
 
-    // Step 2: Handle GitHub callback, exchange code for token
+    // Step 2: Handle GitHub callback
     router.get('/auth/callback', async (req, res) => {
         const { code, state } = req.query;
-        const sid = getSessionId(req);
         let session = await getSession(req);
 
-        // CSRF protection on OAuth state — verify it is exactly 32 hex chars
         if (!state || !/^[0-9a-f]{32}$/.test(state)) {
             console.error('[Auth] Invalid state parameter format:', state);
             return res.status(400).send('Invalid state parameter format');
         }
-
-
 
         if (!session || session.state !== state) {
             console.error('[Auth] Invalid state. Session exists:', !!session, 'Session state:', session ? session.state : 'N/A', 'Query state:', state);
@@ -96,15 +91,9 @@ module.exports = function(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL) {
 
             console.log('[Auth] Token obtained successfully');
 
-            // Disabled Session Rotation: Updating token on existing session to prevent 
-            // the browser from ignoring Set-Cookie on cross-site redirect chains.
             const currentSid = getSessionId(req) || session.sid;
             await db.updateSessionToken(currentSid, tokenData.access_token);
-            
-            // Invalidate the state to prevent replay attacks
             await db.updateSessionState(currentSid, null);
-            
-            // Still ensure the cookie is set just in case it was missing
             setSessionCookie(res, currentSid);
             res.redirect('/');
         } catch (err) {
@@ -113,7 +102,7 @@ module.exports = function(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL) {
         }
     });
 
-    // Step 3: Logout - Immediate database session invalidation
+    // Step 3: Logout
     router.get('/auth/logout', async (req, res) => {
         const sid = getSessionId(req);
         if (sid) {

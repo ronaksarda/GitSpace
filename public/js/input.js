@@ -1,4 +1,3 @@
-// ── Input handling ────────────────────────────────────
 window.addEventListener('resize', () => {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -10,30 +9,28 @@ window.addEventListener('keydown', e => {
   const key = e.key.toLowerCase();
   keys[key] = true;
 
-  // Shortcuts overlay (Feature 10) — toggle with ? or h
+  // Shortcuts overlay toggle
   if (key === '?' || key === '/' || (key === 'h' && !e.ctrlKey)) {
     toggleShortcutsOverlay();
     return;
   }
 
-  // Screenshot (Feature 11) — press P
+  // Screenshot
   if (key === 'p') {
     captureScreenshot();
     return;
   }
 
-  // FPS toggle (Feature 14) — press F
+  // FPS counter toggle
   if (key === 'f') {
     fpsVisible = !fpsVisible;
     return;
   }
 
-  // Close any open shortcuts overlay on movement keys
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
     hideShortcutsOverlay();
   }
 
-  // Escape to close modals/overlays
   if (key === 'escape') {
     document.getElementById('repo-modal')?.classList.add('hidden');
     document.getElementById('profile-modal')?.classList.add('hidden');
@@ -47,29 +44,25 @@ window.addEventListener('keyup', e => {
   keys[e.key.toLowerCase()] = false;
 });
 
-// Prevent infinite travel if window loses focus while a key is held down
 window.addEventListener('blur', () => {
   keys = {};
 });
 
-// Zoom with scroll wheel
+// Zoom
 window.addEventListener('wheel', e => {
   e.preventDefault();
   const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
   camera.zoom = Math.max(0.1, Math.min(2.5, camera.zoom * zoomDelta));
 }, { passive: false });
 
-// Click to Pan/Select
 canvas.addEventListener('mousedown', e => {
   if (e.button === 0) {
     autopilotTarget = null;
   }
 });
 
-// Direct hit-test at click time
 function findBuildingAtPoint(mx, my) {
   for (const island of islands) {
-    // Buildings are already sorted ascending by Y. Iterate backwards for correct top-down clicking.
     for (let i = island.buildings.length - 1; i >= 0; i--) {
       const b = island.buildings[i];
       const bsx = canvas.width / 2 + (b.x - camera.x) * camera.zoom;
@@ -98,7 +91,6 @@ function findIslandAtPoint(mx, my) {
     const isy = canvas.height / 2 + (island.cy - camera.y) * camera.zoom;
     const dx = mx - isx;
     const dy = my - isy;
-    // Generous hit radius for the center icon/base
     if (Math.sqrt(dx * dx + dy * dy) < (40 * camera.zoom + 15)) {
       return island;
     }
@@ -119,7 +111,6 @@ canvas.addEventListener('mouseup', e => {
       document.getElementById('rm-lang').textContent = b.language + (b.isFork ? ' (Fork)' : '');
       document.getElementById('rm-stars').textContent = '⭐ ' + (b.stars || 0).toLocaleString();
 
-      // Rich modal fields (Feature 6)
       const rmDesc = document.getElementById('rm-description');
       if (rmDesc) rmDesc.textContent = b.description || 'No description provided.';
 
@@ -129,7 +120,6 @@ canvas.addEventListener('mouseup', e => {
       const rmUpdated = document.getElementById('rm-updated');
       if (rmUpdated) rmUpdated.textContent = b.updatedAt ? timeAgo(b.updatedAt) : 'Unknown';
 
-      // Size bar
       const rmSizeBar = document.getElementById('rm-size-fill');
       if (rmSizeBar) {
         const maxSize = 100000;
@@ -137,7 +127,6 @@ canvas.addEventListener('mouseup', e => {
         rmSizeBar.style.width = pct + '%';
       }
 
-      // Language color accent
       const rmAccent = document.getElementById('rm-lang-accent');
       if (rmAccent) rmAccent.style.backgroundColor = langColor(b.language);
 
@@ -146,7 +135,6 @@ canvas.addEventListener('mouseup', e => {
       };
       document.getElementById('repo-modal').classList.remove('hidden');
 
-      // Achievement triggers
       if (window.unlockAchievement) {
         if (!window.inspectedRepos) window.inspectedRepos = new Set();
         window.inspectedRepos.add(b.name);
@@ -174,7 +162,6 @@ window.addEventListener('mousemove', e => {
   lastMouse.y = e.clientY;
 });
 
-// ── Shortcuts Overlay (Feature 10) ────────────────────
 let shortcutsVisible = false;
 let shortcutsAutoHide = null;
 
@@ -201,17 +188,14 @@ function hideShortcutsOverlay() {
   clearTimeout(shortcutsAutoHide);
 }
 
-// ── Screenshot (Feature 11) ──────────────────────────
 function captureScreenshot() {
   try {
-    // Create a temporary canvas for watermark
     const tempCanvas = document.createElement('canvas');
     tempCanvas.width = canvas.width;
     tempCanvas.height = canvas.height;
     const tempCtx = tempCanvas.getContext('2d');
     tempCtx.drawImage(canvas, 0, 0);
 
-    // Watermark
     tempCtx.fillStyle = 'rgba(255,255,255,0.15)';
     tempCtx.font = 'bold 14px monospace';
     tempCtx.textAlign = 'right';
@@ -227,14 +211,12 @@ function captureScreenshot() {
   }
 }
 
-// ── Profile Modal Helper (Feature 7) ─────────────────
 function showProfileModal(island) {
   document.getElementById('pm-avatar').src = island.avatar || 'https://github.com/identicons/' + island.login + '.png';
   document.getElementById('pm-name').textContent = island.login;
   document.getElementById('pm-repos').textContent = island.repoCount + ' Repositories';
   document.getElementById('pm-stars').textContent = '⭐ ' + (island.totalStars || 0).toLocaleString();
 
-  // Top repos list (Feature 7)
   const topReposEl = document.getElementById('pm-top-repos');
   if (topReposEl) {
     const sorted = [...island.buildings].sort((a, b) => b.stars - a.stars).slice(0, 5);
@@ -251,7 +233,6 @@ function showProfileModal(island) {
     }
   }
 
-  // Language pie chart (Feature 7)
   drawLanguagePie(island.buildings);
 
   // Share button
@@ -266,7 +247,6 @@ function showProfileModal(island) {
           if (window.showToast) window.showToast('Copy failed');
         });
       } else {
-        // Fallback for non-HTTPS environments like localhost
         const textArea = document.createElement("textarea");
         textArea.value = url;
         textArea.style.position = "fixed";
@@ -286,7 +266,6 @@ function showProfileModal(island) {
     };
   }
 
-  // Badges (Feature 8)
   const badgesEl = document.getElementById('pm-badges');
   if (badgesEl) {
     if (island.badges && island.badges.length > 0) {
@@ -306,14 +285,12 @@ function showProfileModal(island) {
       window.unlockAchievement('mentor_seeker');
     }
 
-    // Check primary language match
     if (window.currentUserLogin && window.currentUserLogin !== island.login && window.myPrimaryLanguage) {
       if (window.myPrimaryLanguage === island.primaryLanguage) {
         window.unlockAchievement('birds_of_feather');
       }
     }
 
-    // Track unique languages visited
     if (!window.visitedLangs) window.visitedLangs = new Set();
     if (island.primaryLanguage && island.primaryLanguage !== 'Unknown') {
       window.visitedLangs.add(island.primaryLanguage);
@@ -332,7 +309,6 @@ function showProfileModal(island) {
   document.getElementById('profile-modal').classList.remove('hidden');
 }
 
-// ── Language Pie Chart (Feature 7) ────────────────────
 function drawLanguagePie(buildings) {
   const pieCanvas = document.getElementById('pm-pie-chart');
   if (!pieCanvas) return;
@@ -345,7 +321,6 @@ function drawLanguagePie(buildings) {
 
   pctx.clearRect(0, 0, size, size);
 
-  // Count languages
   const langCounts = {};
   for (const b of buildings) {
     const lang = b.language || 'Other';
@@ -363,7 +338,6 @@ function drawLanguagePie(buildings) {
   let startAngle = -Math.PI / 2;
   const entries = Object.entries(langCounts).sort((a, b) => b[1] - a[1]);
 
-  // Draw donut chart
   for (const [lang, count] of entries) {
     const sliceAngle = (count / total) * Math.PI * 2;
     pctx.beginPath();
@@ -375,13 +349,12 @@ function drawLanguagePie(buildings) {
     startAngle += sliceAngle;
   }
 
-  // Cut out center for donut effect
+  // Center cutout
   pctx.beginPath();
   pctx.arc(cx, cy, radius * 0.55, 0, Math.PI * 2);
   pctx.fillStyle = 'rgba(10,10,26,0.95)';
   pctx.fill();
 
-  // Center text
   pctx.fillStyle = '#ffffff';
   pctx.font = 'bold 14px monospace';
   pctx.textAlign = 'center';
@@ -391,7 +364,6 @@ function drawLanguagePie(buildings) {
   pctx.font = '9px monospace';
   pctx.fillText('repos', cx, cy + 8);
 
-  // Legend
   if (legendEl) {
     legendEl.innerHTML = entries.slice(0, 6).map(([lang, count]) =>
       `<div class="pie-legend-item">
@@ -403,7 +375,6 @@ function drawLanguagePie(buildings) {
   }
 }
 
-// ── Utility ───────────────────────────────────────────
 function formatSize(kb) {
   if (!kb) return '0 KB';
   if (kb < 1024) return kb + ' KB';
@@ -423,7 +394,6 @@ function timeAgo(dateStr) {
   return Math.floor(seconds / 31536000) + 'y ago';
 }
 
-// ── Mobile Touch Mechanics ────────────────────────────
 let previousTouch = null;
 let initialPinchDistance = null;
 let initialZoom = null;
@@ -469,7 +439,6 @@ canvas.addEventListener('touchmove', e => {
       if (dist > maxRadius) {
         window.touchJoystick.originX += (dx / dist) * (dist - maxRadius);
         window.touchJoystick.originY += (dy / dist) * (dist - maxRadius);
-        // Recalculate after moving origin
         const newDx = touch.clientX - window.touchJoystick.originX;
         const newDy = touch.clientY - window.touchJoystick.originY;
         const newDist = Math.sqrt(newDx * newDx + newDy * newDy);
@@ -505,7 +474,6 @@ canvas.addEventListener('touchend', e => {
       const my = lastMouse.y;
       const hit = findBuildingAtPoint(mx, my);
       if (hit && hit.building) {
-        // trigger the same modal logic as mouseup
         const b = hit.building;
         document.getElementById('rm-name').textContent = b.name;
         document.getElementById('rm-lang').textContent = b.language + (b.isFork ? ' (Fork)' : '');

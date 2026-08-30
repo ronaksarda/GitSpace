@@ -1,4 +1,3 @@
-// ── Search ────────────────────────────────────────────
 const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
 
@@ -15,7 +14,6 @@ function escapeHTML(str) {
   );
 }
 
-// Debounce helper
 let searchTimeout;
 searchInput.addEventListener('input', () => {
   clearTimeout(searchTimeout);
@@ -80,12 +78,10 @@ function openModalForItem(item) {
       if (['JavaScript', 'TypeScript', 'HTML'].includes(lang)) window.unlockAchievement('frontend_master');
     }
   } else if (item.type === 'user') {
-    // Find matching island for full data
     const island = islands.find(i => i.login === item.login);
     if (island) {
       showProfileModal(island);
     } else {
-      // Fetch full profile to get repos and badges
       fetch('/api/user/' + encodeURIComponent(item.login))
         .then(res => res.json())
         .then(fullUser => {
@@ -106,7 +102,6 @@ function openModalForItem(item) {
           showProfileModal(mockIsland);
         })
         .catch(err => {
-          // Fallback with partial data if fetch fails
           document.getElementById('pm-avatar').src = item.avatar || 'https://github.com/identicons/' + item.login + '.png';
           document.getElementById('pm-name').textContent = item.login;
           document.getElementById('pm-repos').textContent = (item.repoCount || 0) + ' Repositories';
@@ -127,20 +122,17 @@ function openModalForItem(item) {
   }
 }
 
-// Speed slider
 const speedSlider = document.getElementById('speed-slider');
 if (speedSlider) {
   speedSlider.addEventListener('input', e => {
     player.speed = parseFloat(e.target.value);
   });
 
-  // Clear keys when interacting with slider to prevent "stuck keys" infinite travel bug
   speedSlider.addEventListener('focus', () => { if (typeof keys !== 'undefined') keys = {}; });
   speedSlider.addEventListener('mousedown', () => { if (typeof keys !== 'undefined') keys = {}; });
   speedSlider.addEventListener('touchstart', () => { if (typeof keys !== 'undefined') keys = {}; });
 }
 
-// Citizens search & rendering logic
 let allCitizens = [];
 
 class TrieNode {
@@ -182,7 +174,6 @@ function renderCitizensList(query = '') {
   if (!query) {
     toRender = allCitizens.slice(0, 50);
   } else {
-    // O(L) prefix search using Trie (L = length of query, effectively O(1) relative to data size)
     toRender = searchTrie(citizensTrie, query);
   }
 
@@ -215,7 +206,6 @@ if (citSearch) {
   });
 }
 
-// ── Auth & Citizens ───────────────────────────────────
 window.logout = function () {
   const hiddenElements = [
     'repo-modal', 'profile-modal', 'citizens-sidebar',
@@ -289,13 +279,11 @@ window.toggleCitizens = async function () {
   }
 };
 
-// Mobile hamburger menu
 window.toggleMobileMenu = function () {
   const menu = document.getElementById('mobile-menu-dropdown');
   if (menu) menu.classList.toggle('hidden');
 };
 
-// ── Event Listeners ───────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const bind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
 
@@ -316,7 +304,6 @@ document.addEventListener('DOMContentLoaded', () => {
   bind('btn-sync', async () => {
     try {
       const btn = document.getElementById('btn-sync');
-      const originalText = btn.textContent;
       btn.textContent = 'Syncing...';
       await fetch('/api/repos', { method: 'POST' });
       window.location.reload();
@@ -325,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Avatar / Name click → warp to own island + show profile
+  // Click avatar/name to warp to own island
   const avatarWarp = async () => {
     const login = window.currentUserLogin;
     if (!login) return;
@@ -334,12 +321,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
-      // Warp camera to own island
       if (typeof flyTo !== 'undefined') {
         flyTo(data.cx, data.cy, null);
       }
 
-      // Build island object and show profile modal
       const island = {
         login: data.login,
         cx: data.cx,
@@ -380,7 +365,6 @@ document.addEventListener('click', e => {
     }
   }
 
-  // Close mobile menu if clicking outside
   const mobileMenu = document.getElementById('mobile-menu-dropdown');
   if (mobileMenu && !mobileMenu.classList.contains('hidden')) {
     if (!e.target.closest('#mobile-menu-dropdown') && !e.target.closest('#btn-mobile-menu')) {
@@ -389,7 +373,7 @@ document.addEventListener('click', e => {
   }
 });
 
-// Global ESC Key Handler
+// Escape key handler
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     const hiddenElements = [
@@ -401,11 +385,9 @@ document.addEventListener('keydown', (e) => {
       const el = document.getElementById(id);
       if (el) el.classList.add('hidden');
     });
-    // Clear text selection to prevent lag
     if (window.getSelection) {
       window.getSelection().removeAllRanges();
     }
-    // Clear search and focus
     const searchInput = document.getElementById('search-input');
     if (searchInput) {
       searchInput.value = '';
@@ -432,27 +414,19 @@ window.showToast = function (msg, duration = 4000) {
   }, duration);
 };
 
-// ── Achievement Tracker ────────────────────────────────
 const ACHIEVEMENTS = [
-  // Exploration Tier
   { id: 'first_flight', title: 'First Flight', desc: 'Use the search bar to warp to a repository.', icon: '🚀' },
   { id: 'architect', title: 'The Architect', desc: 'Inspect 10 different repositories.', icon: '🏛️' },
   { id: 'marathon', title: 'Space Marathon', desc: 'Travel 100,000 distance units.', icon: '🏃' },
-
-  // Discovery Tier
   { id: 'sys_architect', title: 'The Systems Architect', desc: 'Inspect a C, C++, or Rust repository.', icon: '⚙️' },
   { id: 'ai_pioneer', title: 'The AI Pioneer', desc: 'Inspect a Python repository.', icon: '🧠' },
   { id: 'frontend_master', title: 'The Frontend Master', desc: 'Inspect a JavaScript, TypeScript, or HTML repository.', icon: '🎨' },
   { id: 'stargazer', title: 'Stargazer', desc: 'Inspect a repo with 1,000+ stars.', icon: '⭐' },
   { id: 'collector', title: 'The Collector', desc: 'Inspect a repo with 100,000+ KB size.', icon: '📦' },
-
-  // Networking Tier
   { id: 'socialite', title: 'The Socialite', desc: 'Open the Citizens directory.', icon: '🤝' },
   { id: 'birds_of_feather', title: 'Birds of a Feather', desc: 'Visit an island with the same primary language as you.', icon: '🪶' },
   { id: 'mentor_seeker', title: 'The Mentor Seeker', desc: 'Visit an island with more than 50 repos.', icon: '🧙' },
   { id: 'cross_pollination', title: 'Cross-Pollination', desc: 'Visit 3 islands with different primary languages.', icon: '🐝' },
-
-  // Personal Milestones Tier (auto-evaluated on login)
   { id: 'specialist', title: 'The Specialist', desc: 'Have 5+ repos in a single language.', icon: '🎯' },
   { id: 'os_contributor', title: 'Open Source Contributor', desc: 'Have a repo with at least 1 star.', icon: '🌟' },
   { id: 'polyglot', title: 'The Polyglot', desc: 'Have repos spanning 4+ languages.', icon: '🗣️' }
@@ -487,7 +461,6 @@ window.unlockAchievement = function (id) {
     if (typeof showToast === 'function') {
       showToast(`🏆 ACHIEVEMENT UNLOCKED: ${ach.title.toUpperCase()} 🏆\n${ach.desc}`, 4000);
 
-      // Play a quick celebration effect
       const toast = document.getElementById('toast-notification');
       if (toast) {
         toast.style.background = 'linear-gradient(135deg, rgba(251, 191, 36, 0.9), rgba(217, 119, 6, 0.9))';

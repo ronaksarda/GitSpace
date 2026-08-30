@@ -1,8 +1,3 @@
-// ══════════════════════════════════════════════════════
-// GITSPACE — Rendering Engine v2.0
-// ══════════════════════════════════════════════════════
-
-// ── Nebula color clusters (shift with camera) ─────────
 const nebulaColors = [
   { r: 20, g: 8, b: 60 },
   { r: 8, g: 25, b: 50 },
@@ -14,7 +9,6 @@ function drawNebula() {
   ctx.fillStyle = '#030308';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Subtle moving nebula clouds
   const time = Date.now() * 0.0001;
   for (let i = 0; i < 3; i++) {
     const nc = nebulaColors[i % nebulaColors.length];
@@ -33,7 +27,6 @@ function drawNebula() {
   }
 }
 
-// ── Multi-layer parallax stars ────────────────────────
 function drawStars() {
   const layers = [
     { speed: 0.02, sizeMultiplier: 0.6, alpha: 0.4 },
@@ -75,7 +68,6 @@ function drawStars() {
   ctx.globalAlpha = 1;
 }
 
-// ── 2D Slipstream Warp ─────────────────────────────────
 let slipstreamParticles = [];
 function drawSlipstream2D() {
   if (!warpActive) {
@@ -91,7 +83,6 @@ function drawSlipstream2D() {
 
   if (typeof warpProgress === 'undefined' || warpProgress <= 0) return;
 
-  // Calculate direction
   let dirX = 1; let dirY = 0;
   if (typeof autopilotTarget !== 'undefined' && autopilotTarget) {
     const dx = autopilotTarget.x - player.x;
@@ -103,7 +94,6 @@ function drawSlipstream2D() {
     }
   }
 
-  // Initialize particles once
   if (slipstreamParticles.length === 0) {
     for (let i = 0; i < 200; i++) {
       slipstreamParticles.push({
@@ -151,7 +141,6 @@ function drawSlipstream2D() {
   ctx.globalCompositeOperation = 'source-over';
 }
 
-// ── Shooting stars ────────────────────────────────────
 let shootingStars = [];
 let lastShootingStar = 0;
 
@@ -194,7 +183,6 @@ function updateShootingStars() {
   ctx.lineCap = 'butt';
 }
 
-// ── Draw island ───────────────────────────────────────
 function drawIsland(island) {
   const { cx, cy, color, islandRadius, login, isActive, buildings, repoCount } = island;
   const scx = canvas.width / 2;
@@ -206,12 +194,11 @@ function drawIsland(island) {
   if (sx < -sr - 200 || sx > canvas.width + sr + 200) return;
   if (sy < -sr - 200 || sy > canvas.height + sr + 200) return;
 
-  // Activity heatmap ring (Feature 9)
   if (camera.zoom > 0.15 && buildings.length > 0) {
     drawHeatmapRing(island, sx, sy, sr);
   }
 
-  // Atmospheric glow for active users
+  // Active user glow
   if (isActive) {
     const pulsePhase = Math.sin(Date.now() * 0.002) * 0.03 + 0.07;
     const glowGrad = ctx.createRadialGradient(sx, sy, sr * 0.5, sx, sy, sr * 1.8);
@@ -224,7 +211,7 @@ function drawIsland(island) {
     ctx.fill();
   }
 
-  // Water shimmer border
+  // Coast shimmer
   if (camera.zoom > 0.15) {
     const waterPhase = Date.now() * 0.003;
     ctx.globalAlpha = 0.35;
@@ -249,7 +236,7 @@ function drawIsland(island) {
   }
   ctx.globalAlpha = 1;
 
-  // Ground — concentric terrain rings
+  // Ground terrain rings
   const terrainRings = [
     { ratio: 1.0, color: '#0a0a14', alpha: 1.0 },
     { ratio: 0.85, color: '#0d1220', alpha: 0.8 },
@@ -264,7 +251,7 @@ function drawIsland(island) {
   }
   ctx.globalAlpha = 1;
 
-  // Color overlay on ground
+  // Color overlay
   ctx.fillStyle = color;
   ctx.globalAlpha = 0.2;
   ctx.beginPath();
@@ -272,12 +259,11 @@ function drawIsland(island) {
   ctx.fill();
   ctx.globalAlpha = 1;
 
-  // Border
   ctx.strokeStyle = color + '55';
   ctx.lineWidth = 2 * camera.zoom;
   ctx.stroke();
 
-  // Road lines from center to buildings
+  // Road lines
   if (camera.zoom > 0.3 && buildings.length > 0) {
     ctx.strokeStyle = '#1a2a1a';
     ctx.lineWidth = 1.5 * camera.zoom;
@@ -295,7 +281,7 @@ function drawIsland(island) {
     ctx.globalAlpha = 1;
   }
 
-  // Floating debris particles around island
+  // Orbiting particles
   if (camera.zoom > 0.3) {
     const debrisCount = Math.min(8, Math.floor(repoCount / 3));
     const t = Date.now() * 0.001;
@@ -313,16 +299,14 @@ function drawIsland(island) {
     ctx.globalAlpha = 1;
   }
 
-  // Draw buildings
   for (const b of buildings) {
     drawBuilding(b, scx, scy);
   }
 
-  // Nameplate, avatar, badges
+  // Nameplate and avatar
   if (camera.zoom > 0.1) {
     const nameplateY = sy - sr - (20 * camera.zoom);
 
-    // Avatar
     if (island.avatarImg && island.avatarImg.complete && island.avatarImg.naturalWidth > 0) {
       const avatarSize = 40 * camera.zoom;
       ctx.save();
@@ -333,7 +317,6 @@ function drawIsland(island) {
       ctx.drawImage(island.avatarImg, sx - avatarSize / 2, nameplateY - avatarSize - (5 * camera.zoom), avatarSize, avatarSize);
       ctx.restore();
 
-      // Avatar border with glow
       ctx.beginPath();
       ctx.arc(sx, nameplateY - avatarSize / 2 - (5 * camera.zoom), avatarSize / 2, 0, Math.PI * 2);
       ctx.strokeStyle = color;
@@ -344,7 +327,6 @@ function drawIsland(island) {
       ctx.shadowBlur = 0;
     }
 
-    // Nameplate background
     ctx.font = `bold ${Math.max(8, 12 * camera.zoom)}px 'Space Mono', monospace`;
     ctx.fillStyle = 'rgba(5, 5, 15, 0.85)';
     const textWidth = ctx.measureText(login).width + 30 * camera.zoom;
@@ -352,7 +334,6 @@ function drawIsland(island) {
     const npX = sx - textWidth / 2;
     const npY = nameplateY;
 
-    // Rounded nameplate
     const npRadius = 4 * camera.zoom;
     ctx.beginPath();
     ctx.moveTo(npX + npRadius, npY);
@@ -374,21 +355,18 @@ function drawIsland(island) {
     ctx.textAlign = 'center';
     ctx.fillText(login, sx, nameplateY + 15 * camera.zoom);
 
-    // Repo count
     if (camera.zoom > 0.2) {
       ctx.fillStyle = color;
       ctx.font = `bold ${Math.max(8, 10 * camera.zoom)}px 'Space Mono', monospace`;
       ctx.fillText(repoCount + ' Repos', sx, nameplateY + 34 * camera.zoom);
     }
 
-    // Badges (Feature 8)
     if (camera.zoom > 0.35 && island.badges && island.badges.length > 0) {
       drawBadges(island.badges, sx, nameplateY + 46 * camera.zoom, camera.zoom);
     }
   }
 }
 
-// ── Activity Heatmap Ring (Feature 9) ─────────────────
 function drawHeatmapRing(island, sx, sy, sr) {
   const buildings = island.buildings;
   if (buildings.length === 0) return;
@@ -399,7 +377,6 @@ function drawHeatmapRing(island, sx, sy, sr) {
 
   for (let i = 0; i < buildings.length; i++) {
     const b = buildings[i];
-    // Use updatedAt if available, else use stars as proxy for freshness
     let freshness = 0.3;
     if (b.updatedAt) {
       const age = Date.now() - new Date(b.updatedAt).getTime();
@@ -425,7 +402,6 @@ function drawHeatmapRing(island, sx, sy, sr) {
   }
 }
 
-// ── Badge Renderer (Feature 8) ────────────────────────
 function drawBadges(badges, x, y, zoom) {
   const badgeSize = 14 * zoom;
   const gap = 4 * zoom;
@@ -437,7 +413,6 @@ function drawBadges(badges, x, y, zoom) {
   ctx.textBaseline = 'middle';
 
   for (const badge of badges) {
-    // Badge circle background
     ctx.fillStyle = badge.bgColor || 'rgba(20,20,40,0.8)';
     ctx.beginPath();
     ctx.arc(bx + badgeSize / 2, y, badgeSize / 2, 0, Math.PI * 2);
@@ -446,7 +421,6 @@ function drawBadges(badges, x, y, zoom) {
     ctx.lineWidth = 1 * zoom;
     ctx.stroke();
 
-    // Badge emoji
     ctx.fillStyle = '#ffffff';
     ctx.fillText(badge.icon, bx + badgeSize / 2, y + 1 * zoom);
 
@@ -455,7 +429,6 @@ function drawBadges(badges, x, y, zoom) {
   ctx.textBaseline = 'alphabetic';
 }
 
-// ── Draw building (Enhanced - Feature 3) ──────────────
 function drawBuilding(b, scx, scy) {
   const bsx = scx + (b.x - camera.x) * camera.zoom;
   const bsy = scy + (b.y - camera.y) * camera.zoom;
@@ -468,7 +441,7 @@ function drawBuilding(b, scx, scy) {
 
   const color = b.isFork ? '#64748b' : b.color;
   
-  // Extreme low-zoom culling (travel/warp mode optimization)
+  // Extreme low-zoom culling
   if (camera.zoom < 0.05) {
     ctx.fillStyle = color;
     ctx.globalAlpha = 0.6;
@@ -479,7 +452,7 @@ function drawBuilding(b, scx, scy) {
 
   const depth = bw * 0.6;
 
-  // High-star golden aura
+  // Star aura
   if (b.stars > 100 && !b.isFork && camera.zoom > 0.2) {
     const pulseAlpha = 0.15 + Math.sin(Date.now() * 0.003 + b.seed * 10) * 0.08;
     const auraGrad = ctx.createRadialGradient(bsx, bsy - bh / 2, bw * 0.3, bsx, bsy - bh / 2, bw * 2);
@@ -489,7 +462,7 @@ function drawBuilding(b, scx, scy) {
     ctx.fillRect(bsx - bw * 2, bsy - bh - bw * 2, bw * 4, bh + bw * 4);
   }
 
-  // Ground shadow
+  // Shadow
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.beginPath();
   ctx.moveTo(bsx - bw / 2, bsy);
@@ -498,7 +471,7 @@ function drawBuilding(b, scx, scy) {
   ctx.lineTo(bsx + bw / 2, bsy);
   ctx.fill();
 
-  // Right face — darker shade
+  // Right side face
   ctx.fillStyle = color;
   ctx.globalAlpha = 0.5;
   ctx.beginPath();
@@ -509,7 +482,7 @@ function drawBuilding(b, scx, scy) {
   ctx.fill();
   ctx.globalAlpha = 1;
 
-  // Front face — gradient
+  // Front face
   if (bh > 5 && bw > 3) {
     const faceGrad = ctx.createLinearGradient(bsx, bsy, bsx, bsy - bh);
     const darkerColor = darkenHex(color, 0.3);
@@ -533,9 +506,7 @@ function drawBuilding(b, scx, scy) {
   ctx.lineTo(bsx + bw / 2, bsy - bh);
   ctx.fill();
 
-  // Tier-specific details
   if (b.tier === 'skyscraper' && camera.zoom > 0.3) {
-    // Antenna with blinking light
     const antennaX = bsx;
     const antennaBottom = bsy - bh;
     const antennaTop = antennaBottom - 15 * camera.zoom;
@@ -546,7 +517,6 @@ function drawBuilding(b, scx, scy) {
     ctx.lineTo(antennaX, antennaTop);
     ctx.stroke();
 
-    // Blinking red light
     const blink = Math.sin(Date.now() * 0.005 + b.seed * 100) > 0;
     if (blink) {
       ctx.fillStyle = '#ff3333';
@@ -560,7 +530,6 @@ function drawBuilding(b, scx, scy) {
   }
 
   if (b.tier === 'tower' && camera.zoom > 0.3) {
-    // Neon accent stripe
     ctx.fillStyle = color;
     ctx.shadowColor = color;
     ctx.shadowBlur = 4;
@@ -570,7 +539,6 @@ function drawBuilding(b, scx, scy) {
     ctx.globalAlpha = 1;
   }
 
-  // Windows — warm amber for houses, cool white for towers/skyscrapers
   if (bw > 6 && bh > 10 && !b.isFork) {
     const windowColor = (b.tier === 'house' || b.tier === 'hut')
       ? 'rgba(255,200,100,0.8)'
@@ -592,7 +560,6 @@ function drawBuilding(b, scx, scy) {
     }
   }
 
-  // Hut doorway
   if (b.tier === 'hut' && camera.zoom > 0.5) {
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
     const doorW = 3 * camera.zoom;
@@ -600,7 +567,6 @@ function drawBuilding(b, scx, scy) {
     ctx.fillRect(bsx - doorW / 2, bsy - doorH, doorW, doorH);
   }
 
-  // Fork dashed outline
   if (b.isFork && camera.zoom > 0.4) {
     ctx.strokeStyle = '#94a3b8';
     ctx.lineWidth = 1;
@@ -609,7 +575,6 @@ function drawBuilding(b, scx, scy) {
     ctx.setLineDash([]);
   }
 
-  // Hover highlight
   if (isNear) {
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 2;
@@ -627,7 +592,6 @@ function drawBuilding(b, scx, scy) {
     ctx.shadowBlur = 0;
   }
 
-  // Building name label
   if ((camera.zoom > 0.4 && bw > 4) || isNear) {
     ctx.font = `${Math.max(7, 8 * camera.zoom)}px 'Space Mono', monospace`;
     ctx.textAlign = 'center';
@@ -674,7 +638,6 @@ function drawBuilding(b, scx, scy) {
   }
 }
 
-// ── Draw player (Feature 4 — enhanced ship) ──────────
 let idleTime = 0;
 let lastMovingState = false;
 
@@ -686,7 +649,6 @@ function drawPlayer() {
   if (isMoving) { idleTime = 0; lastMovingState = true; }
   else { idleTime++; lastMovingState = false; }
 
-  // Trails with color variation
   ctx.globalCompositeOperation = 'screen';
   for (let i = trails.length - 1; i >= 0; i--) {
     const t = trails[i];
@@ -698,7 +660,6 @@ function drawPlayer() {
     const tsx = canvas.width / 2 + (t.x - camera.x) * camera.zoom;
     const tsy = canvas.height / 2 + (t.y - camera.y) * camera.zoom;
 
-    // Gradient trail: cyan → purple
     const hue = 185 + (1 - t.life) * 60;
     ctx.fillStyle = `hsla(${hue}, 80%, 60%, ${t.life * 0.8})`;
     ctx.beginPath();
@@ -711,7 +672,7 @@ function drawPlayer() {
   ctx.translate(sx, sy);
   ctx.rotate(playerAngle);
 
-  // Dynamic engine flame (scales with speed)
+  // Engine flame
   const flameLength = 8 + player.speed * 0.8;
   const flameFlicker = Math.sin(Date.now() * 0.02) * 3;
   if (isMoving) {
@@ -725,7 +686,6 @@ function drawPlayer() {
     ctx.fill();
     ctx.globalAlpha = 1;
 
-    // Inner flame
     ctx.fillStyle = '#67e8f9';
     ctx.globalAlpha = 0.8;
     ctx.beginPath();
@@ -746,7 +706,7 @@ function drawPlayer() {
   ctx.fill();
   ctx.shadowBlur = 0;
 
-  // Hull
+  // Ship hull
   ctx.fillStyle = '#e2e8f0';
   ctx.beginPath();
   ctx.moveTo(18, 0);
@@ -758,7 +718,6 @@ function drawPlayer() {
   ctx.closePath();
   ctx.fill();
 
-  // Hull accent stripe
   ctx.strokeStyle = '#06b6d4';
   ctx.lineWidth = 1;
   ctx.globalAlpha = 0.6;
@@ -777,13 +736,13 @@ function drawPlayer() {
   ctx.beginPath();
   ctx.ellipse(2, 0, 6, 3, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Cockpit reflection
+
   ctx.fillStyle = 'rgba(6,182,212,0.3)';
   ctx.beginPath();
   ctx.ellipse(4, -1, 3, 1.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Wing-tip particles
+  // Wing sparkles
   if (isMoving && camera.zoom > 0.3) {
     const sparkAlpha = 0.3 + Math.random() * 0.4;
     ctx.fillStyle = `rgba(6,182,212,${sparkAlpha})`;
@@ -797,7 +756,7 @@ function drawPlayer() {
 
   ctx.restore();
 
-  // Shield ring when idle > 3 seconds (180 frames at 60fps)
+  // Idle shield ring
   if (idleTime > 180 && !autopilotTarget) {
     const shieldAlpha = Math.min(0.3, (idleTime - 180) / 300);
     const shieldPulse = Math.sin(Date.now() * 0.003) * 2;
@@ -811,11 +770,9 @@ function drawPlayer() {
   }
 }
 
-// ── Warp drive overlay (Feature 5) ────────────────────
 function drawWarpOverlay() {
   if (!warpActive) return;
 
-  // Radial blue vignette
   const grad = ctx.createRadialGradient(
     canvas.width / 2, canvas.height / 2, canvas.width * 0.2,
     canvas.width / 2, canvas.height / 2, canvas.width * 0.6
@@ -825,7 +782,6 @@ function drawWarpOverlay() {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Speed lines from center
   ctx.strokeStyle = 'rgba(100,180,255,0.15)';
   ctx.lineWidth = 1;
   for (let i = 0; i < 30; i++) {
@@ -845,14 +801,12 @@ function drawWarpOverlay() {
   }
 }
 
-// ── Minimap & Compass ─────────────────────────────────
 function drawMinimap() {
   const mmSize = isMobile() ? 90 : 150;
   const mmPadding = isMobile() ? 8 : 20;
   const mmx = canvas.width - mmSize - mmPadding;
   const mmy = isMobile() ? 8 : canvas.height - mmSize - mmPadding;
 
-  // Background with rounded corners
   ctx.fillStyle = 'rgba(10, 10, 25, 0.85)';
   ctx.strokeStyle = '#2a2a4a';
   ctx.lineWidth = 1;
@@ -871,7 +825,6 @@ function drawMinimap() {
   ctx.fill();
   ctx.stroke();
 
-  // Title
   ctx.fillStyle = '#4a4a6a';
   ctx.font = '8px monospace';
   ctx.textAlign = 'left';
@@ -879,7 +832,6 @@ function drawMinimap() {
 
   const mapScale = mmSize / (CHUNK_SIZE * 3);
 
-  // Draw islands on minimap with glow
   for (const island of islands) {
     const mx = mmx + mmSize / 2 + (island.cx - player.x) * mapScale;
     const my = mmy + mmSize / 2 + (island.cy - player.y) * mapScale;
@@ -894,7 +846,6 @@ function drawMinimap() {
     }
   }
 
-  // Player dot with pulsing ring
   const pdx = mmx + mmSize / 2;
   const pdy = mmy + mmSize / 2;
   ctx.fillStyle = '#06b6d4';
@@ -902,7 +853,6 @@ function drawMinimap() {
   ctx.arc(pdx, pdy, 3, 0, Math.PI * 2);
   ctx.fill();
 
-  // Pulsing ring
   const pulseRadius = 5 + Math.sin(Date.now() * 0.004) * 2;
   ctx.strokeStyle = 'rgba(6,182,212,0.5)';
   ctx.lineWidth = 1;
@@ -912,7 +862,7 @@ function drawMinimap() {
 }
 
 function drawCompass() {
-  if (warpActive) return; // Hide during warp
+  if (warpActive) return;
 
   let closestIsland = null;
   let closestDist = Infinity;
@@ -953,7 +903,6 @@ function drawCompass() {
     ctx.shadowBlur = 0;
     ctx.restore();
 
-    // Name label with distance
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
     ctx.font = '10px monospace';
     ctx.textAlign = 'center';
@@ -962,7 +911,6 @@ function drawCompass() {
   }
 }
 
-// ── FPS Counter (Feature 14, dev mode) ────────────────
 let fpsVisible = false;
 let fpsFrames = 0;
 let fpsLastTime = Date.now();
@@ -985,7 +933,6 @@ function drawFPS() {
   ctx.fillText(fpsDisplay + ' FPS', 10, fpsY);
 }
 
-// ── Check proximity to repos ──────────────────────────
 function checkProximity() {
   nearbyRepo = null;
   let clickedRepo = null;
@@ -1042,7 +989,6 @@ function checkProximity() {
   }
 }
 
-// ── Utility ───────────────────────────────────────────
 function hexToRgba(hex, alpha) {
   const cleaned = hex.replace('#', '');
   const r = parseInt(cleaned.substring(0, 2), 16) || 0;

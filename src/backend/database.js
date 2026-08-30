@@ -23,8 +23,8 @@ const pool = isSandbox ? null : new Pool({
     ssl: process.env.DATABASE_SSL_CA
         ? { ca: require('fs').readFileSync(process.env.DATABASE_SSL_CA), rejectUnauthorized: true }
         : { rejectUnauthorized: false },
-    max: 20, // Cap connections to prevent DB exhaustion DDoS
-    connectionTimeoutMillis: 15000 // Allow up to 15s for Supabase to wake up from pause
+    max: 20,
+    connectionTimeoutMillis: 15000
 });
 
 if (pool) {
@@ -148,12 +148,11 @@ function decryptToken(text) {
     }
 }
 
-// Initialize DB schema
 async function initDb() {
     if (isSandbox) {
         console.log('[SandboxDB] Initializing Local JSON Database Sandbox...');
         const data = loadSandboxData();
-        saveSandboxData(data); // ensure the structure is written
+        saveSandboxData(data);
         console.log('[SandboxDB] Local JSON Database Sandbox Ready.');
         return;
     }
@@ -163,7 +162,7 @@ async function initDb() {
     while (retries > 0) {
         try {
             client = await pool.connect();
-            break; // connection successful
+            break;
         } catch (err) {
             console.error(`[DB] Connection failed. Retries left: ${retries - 1}. Error: ${err.message}`);
             retries--;
@@ -171,7 +170,7 @@ async function initDb() {
                 console.error('[DB] FATAL: Could not connect to database to initialize schema. Auto-falling back to Sandbox mode!');
                 isSandbox = true;
                 const data = loadSandboxData();
-                saveSandboxData(data); // Ensure sandbox file exists
+                saveSandboxData(data);
                 return;
             }
             await new Promise(r => setTimeout(r, 3000));
@@ -188,7 +187,6 @@ async function initDb() {
             );
         `);
 
-        // Migrate old schema: rename 'id' column to 'sid' if it exists
         try {
             const colCheck = await client.query(`
                 SELECT column_name FROM information_schema.columns 
@@ -199,7 +197,6 @@ async function initDb() {
                 await client.query(`ALTER TABLE sessions RENAME COLUMN id TO sid`);
             }
         } catch (migErr) {
-            // Column already named sid or migration not needed
         }
 
         await client.query(`
@@ -232,7 +229,6 @@ async function initDb() {
             );
         `);
 
-        // Migration for existing tables
         try {
             await client.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS description TEXT;`);
             await client.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS updated_at VARCHAR(100);`);
@@ -240,8 +236,6 @@ async function initDb() {
             console.log('[DB] Note: Migration for repos table description/updated_at skipped or failed', e.message);
         }
 
-        // Indexes and Extensions
-        // Note: Dropped pg_trgm GIN indexes as they consume massive amounts of memory on the Supabase Free Tier.
         await client.query(`DROP INDEX IF EXISTS idx_repos_name;`).catch(() => {});
         await client.query(`DROP INDEX IF EXISTS idx_users_login_trgm;`).catch(() => {});
         
@@ -250,9 +244,7 @@ async function initDb() {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_repos_name_btree ON repos (name);`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_users_login_btree ON users (login);`);
 
-        // Row Level Security is left at Postgres defaults as requested by security audit.
-
-        console.log('[DB] PostgreSQL Schema Ready. RLS Disabled.');
+        console.log('[DB] PostgreSQL Schema Ready.');
     } catch (err) {
         console.error('[DB] Error initializing database:', err.message);
     } finally {
@@ -260,7 +252,6 @@ async function initDb() {
     }
 }
 
-// --- Session Management (all use `sid` column consistently) ---
 async function createSession(sid, state, token = null) {
     if (isSandbox) {
         const data = loadSandboxData();
@@ -341,7 +332,6 @@ async function deleteSession(sid) {
     await pool.query(`DELETE FROM sessions WHERE sid = $1`, [sid]);
 }
 
-// --- Spatial Data Management ---
 async function saveUserLayout(login, cx, cy, avatar, repos) {
     if (isSandbox) {
         const langCounts = {};
@@ -361,7 +351,6 @@ async function saveUserLayout(login, cx, cy, avatar, repos) {
         const data = loadSandboxData();
         const now = Date.now();
 
-        // Save user
         data.users[login] = {
             login,
             cx,
@@ -372,10 +361,8 @@ async function saveUserLayout(login, cx, cy, avatar, repos) {
             last_login: now
         };
 
-        // Remove old repos
         data.repos = data.repos.filter(r => r.login !== login);
 
-        // Add new repos
         for (const r of repos) {
             data.repos.push({
                 login,
@@ -450,7 +437,6 @@ async function saveUserLayout(login, cx, cy, avatar, repos) {
         await client.query('COMMIT');
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('[DB] Transaction failed in saveUserLayout:', err);
         throw err;
     } finally {
         client.release();
@@ -458,7 +444,7 @@ async function saveUserLayout(login, cx, cy, avatar, repos) {
 }
 
 async function getChunks(minX, minY, maxX, maxY) {
-    const PADDING = 600; // coordinate padding buffer to prevent islands from vanishing abruptly
+    const PADDING = 600;
     const qMinX = minX - PADDING;
     const qMaxX = maxX + PADDING;
     const qMinY = minY - PADDING;
@@ -478,9 +464,8 @@ async function getChunks(minX, minY, maxX, maxY) {
                     cy: u.cy,
                     avatar: u.avatar,
                     primaryLanguage: u.primary_language,
-                    firstSeen: u.first_seen,
-                    isActive: (now - u.last_login) < ONE_WEEK_MS,
-                    repos: []
+                    isActive: (now - (u.last_login || u.first_seen || 0)) < ONE_WEEK_MS,
+                    buildings: []
                 };
                 logins.push(u.login);
             }
@@ -488,7 +473,7 @@ async function getChunks(minX, minY, maxX, maxY) {
 
         for (const r of data.repos) {
             if (userMap[r.login]) {
-                userMap[r.login].repos.push({
+                userMap[r.login].buildings.push({
                     name: r.name,
                     language: r.language,
                     url: r.url,
@@ -507,121 +492,92 @@ async function getChunks(minX, minY, maxX, maxY) {
         return { users: userMap };
     }
 
-    const usersRes = await pool.query(`
-        SELECT login, cx, cy, avatar, primary_language, first_seen, last_login FROM users 
-        WHERE cx >= $1 AND cx <= $2 AND cy >= $3 AND cy <= $4
-    `, [qMinX, qMaxX, qMinY, qMaxY]);
+    const client = await pool.connect();
+    try {
+        const usersRes = await client.query(`
+            SELECT login, cx, cy, avatar, primary_language, first_seen, last_login 
+            FROM users 
+            WHERE cx >= $1 AND cx <= $2 AND cy >= $3 AND cy <= $4
+        `, [qMinX, qMaxX, qMinY, qMaxY]);
 
-    if (usersRes.rows.length === 0) {
-        return { users: {} };
-    }
+        if (usersRes.rows.length === 0) return { users: {} };
 
-    const userMap = {};
-    const logins = [];
+        const userMap = {};
+        const logins = [];
+        const ONE_WEEK_MS = 7 * 24 * 3600 * 1000;
+        const now = Date.now();
 
-    const ONE_WEEK_MS = 7 * 24 * 3600 * 1000;
-    const now = Date.now();
-
-    for (const u of usersRes.rows) {
-        userMap[u.login] = {
-            cx: u.cx,
-            cy: u.cy,
-            avatar: u.avatar,
-            primaryLanguage: u.primary_language,
-            firstSeen: u.first_seen,
-            isActive: (now - u.last_login) < ONE_WEEK_MS,
-            repos: []
-        };
-        logins.push(u.login);
-    }
-
-    const reposRes = await pool.query(`
-        SELECT login, name, language, url, size, stars, isfork, description, updated_at, x, y, radius FROM repos WHERE login = ANY($1::varchar[])
-    `, [logins]);
-
-    for (const r of reposRes.rows) {
-        if (userMap[r.login]) {
-            userMap[r.login].repos.push({
-                name: r.name,
-                language: r.language,
-                url: r.url,
-                size: r.size,
-                stars: r.stars,
-                isFork: r.isfork,
-                description: r.description,
-                updatedAt: r.updated_at,
-                x: r.x,
-                y: r.y,
-                radius: r.radius
-            });
+        for (const u of usersRes.rows) {
+            userMap[u.login] = {
+                cx: u.cx,
+                cy: u.cy,
+                avatar: u.avatar,
+                primaryLanguage: u.primary_language,
+                isActive: (now - (u.last_login || u.first_seen || 0)) < ONE_WEEK_MS,
+                buildings: []
+            };
+            logins.push(u.login);
         }
-    }
 
-    return { users: userMap };
+        const reposRes = await client.query(`
+            SELECT login, name, language, url, size, stars, isfork, description, updated_at, x, y, radius 
+            FROM repos 
+            WHERE login = ANY($1)
+        `, [logins]);
+
+        for (const r of reposRes.rows) {
+            if (userMap[r.login]) {
+                userMap[r.login].buildings.push({
+                    name: r.name,
+                    language: r.language,
+                    url: r.url,
+                    size: r.size,
+                    stars: r.stars,
+                    isFork: r.isfork,
+                    description: r.description,
+                    updatedAt: r.updated_at,
+                    x: r.x,
+                    y: r.y,
+                    radius: r.radius
+                });
+            }
+        }
+
+        return { users: userMap };
+    } finally {
+        client.release();
+    }
 }
 
 async function getUser(login) {
     if (isSandbox) {
         const data = loadSandboxData();
-        const u = data.users[login];
-        if (!u) return null;
-        return {
-            login: u.login,
-            cx: u.cx,
-            cy: u.cy,
-            avatar: u.avatar,
-            primary_language: u.primary_language
-        };
+        return data.users[login] || null;
     }
-    const res = await pool.query(`SELECT login, cx, cy, avatar, primary_language FROM users WHERE login = $1`, [login]);
-    return res.rows.length > 0 ? res.rows[0] : null;
+    const res = await pool.query(`SELECT * FROM users WHERE login = $1`, [login]);
+    return res.rows[0] || null;
 }
 
 async function getRepos(login) {
     if (isSandbox) {
         const data = loadSandboxData();
-        return data.repos
-            .filter(r => r.login === login)
-            .map(r => ({
-                name: r.name,
-                language: r.language,
-                url: r.url,
-                size: r.size,
-                stars: r.stars,
-                isFork: r.isfork,
-                description: r.description,
-                updatedAt: r.updated_at,
-                x: r.x,
-                y: r.y,
-                radius: r.radius
-            }));
+        return data.repos.filter(r => r.login === login);
     }
-    const res = await pool.query(`SELECT name, language, url, size, stars, isfork, description, updated_at, x, y, radius FROM repos WHERE login = $1`, [login]);
-    return res.rows.map(r => ({
-        name: r.name,
-        language: r.language,
-        url: r.url,
-        size: r.size,
-        stars: r.stars,
-        isFork: r.isfork,
-        description: r.description,
-        updatedAt: r.updated_at,
-        x: r.x,
-        y: r.y,
-        radius: r.radius
-    }));
+    const res = await pool.query(`SELECT * FROM repos WHERE login = $1`, [login]);
+    return res.rows;
 }
 
 async function updateLastLogin(login) {
+    const now = Date.now();
     if (isSandbox) {
         const data = loadSandboxData();
         if (data.users[login]) {
-            data.users[login].last_login = Date.now();
+            data.users[login].last_login = now;
             saveSandboxData(data);
         }
         return;
     }
-    await pool.query(`UPDATE users SET last_login = $1 WHERE login = $2`, [Date.now(), login]);
+    await pool.query(`UPDATE users SET last_login = $1 WHERE login = $2`, [now, login]);
 }
 
 async function getStats() {
@@ -632,94 +588,94 @@ async function getStats() {
             totalRepos: data.repos.length
         };
     }
-    const usersRes = await pool.query(`SELECT COUNT(*) AS count FROM users`);
-    const reposRes = await pool.query(`SELECT COUNT(*) AS count FROM repos`);
+    const usersRes = await pool.query(`SELECT COUNT(*) FROM users`);
+    const reposRes = await pool.query(`SELECT COUNT(*) FROM repos`);
     return {
-        totalUsers: parseInt(usersRes.rows[0].count, 10),
-        totalRepos: parseInt(reposRes.rows[0].count, 10)
+        totalUsers: parseInt(usersRes.rows[0].count),
+        totalRepos: parseInt(reposRes.rows[0].count)
     };
 }
 
 async function getCitizens(limit = 50, offset = 0) {
     if (isSandbox) {
         const data = loadSandboxData();
-        const userStars = {};
-        const userRepoCounts = {};
-
-        for (const u of Object.keys(data.users)) {
-            userStars[u] = 0;
-            userRepoCounts[u] = 0;
+        const citizens = [];
+        for (const u of Object.values(data.users)) {
+            const userRepos = data.repos.filter(r => r.login === u.login);
+            const totalStars = userRepos.reduce((sum, r) => sum + (r.stars || 0), 0);
+            citizens.push({
+                login: u.login,
+                avatar: u.avatar,
+                primaryLanguage: u.primary_language,
+                x: u.cx,
+                y: u.cy,
+                repoCount: userRepos.length,
+                totalStars: totalStars
+            });
         }
-
-        for (const r of data.repos) {
-            if (data.users[r.login]) {
-                userRepoCounts[r.login]++;
-                userStars[r.login] += (r.stars || 0);
-            }
-        }
-
-        const citizensList = Object.values(data.users).map(u => ({
-            login: u.login,
-            avatar: u.avatar,
-            primaryLanguage: u.primary_language,
-            x: u.cx,
-            y: u.cy,
-            repoCount: userRepoCounts[u.login] || 0,
-            totalStars: userStars[u.login] || 0
-        }));
-
-        citizensList.sort((a, b) => b.totalStars - a.totalStars || a.login.localeCompare(b.login));
-
-        return citizensList.slice(offset, offset + limit);
+        citizens.sort((a, b) => b.totalStars - a.totalStars || b.repoCount - a.repoCount);
+        return citizens.slice(offset, offset + limit);
     }
-    const res = await pool.query(`
-        SELECT u.login, u.avatar, u.primary_language, u.cx, u.cy,
-               COUNT(r.id) AS repo_count,
-               COALESCE(SUM(r.stars), 0) AS total_stars
+
+    const query = `
+        SELECT 
+            u.login, 
+            u.avatar, 
+            u.primary_language as "primaryLanguage", 
+            u.cx as x, 
+            u.cy as y,
+            COUNT(r.id)::int as "repoCount",
+            COALESCE(SUM(r.stars), 0)::int as "totalStars"
         FROM users u
-        LEFT JOIN repos r ON r.login = u.login
+        LEFT JOIN repos r ON u.login = r.login
         GROUP BY u.login, u.avatar, u.primary_language, u.cx, u.cy
-        ORDER BY total_stars DESC
-        LIMIT $1 OFFSET $2
-    `, [limit, offset]);
-    return res.rows.map(row => ({
-        login: row.login,
-        avatar: row.avatar,
-        primaryLanguage: row.primary_language,
-        x: row.cx,
-        y: row.cy,
-        repoCount: parseInt(row.repo_count, 10),
-        totalStars: parseInt(row.total_stars, 10)
-    }));
+        ORDER BY "totalStars" DESC, "repoCount" DESC
+        LIMIT $1 OFFSET $2;
+    `;
+    const res = await pool.query(query, [limit, offset]);
+    return res.rows;
 }
 
 async function getSpawnPoint() {
     if (isSandbox) {
         const data = loadSandboxData();
         const users = Object.values(data.users);
-        return users.length > 0 ? { x: users[0].cx, y: users[0].cy } : null;
+        if (users.length > 0) {
+            return { x: users[0].cx, y: users[0].cy };
+        }
+        return { x: 0, y: 0 };
     }
-    const res = await pool.query(`SELECT cx, cy FROM users LIMIT 1`);
-    return res.rows.length > 0 ? { x: res.rows[0].cx, y: res.rows[0].cy } : null;
+    const res = await pool.query(`SELECT cx as x, cy as y FROM users ORDER BY last_login DESC LIMIT 1`);
+    return res.rows[0] || { x: 0, y: 0 };
 }
 
-async function searchGlobal(query) {
-    const escaped = query.replace(/%/g, '\\%').replace(/_/g, '\\_');
-    const q = `${escaped}%`;
-
+async function searchGlobal(q) {
+    q = `%${q}%`;
     if (isSandbox) {
         const data = loadSandboxData();
-        const lowerQ = query.toLowerCase().trim();
+        const cleanQ = q.replace(/%/g, '').toLowerCase();
 
-        if (!sandboxTrie || lastTrieBuildTime !== lastLoadedTime) {
-            sandboxTrie = buildSandboxTrie(data);
-            lastTrieBuildTime = lastLoadedTime;
+        const matches = [];
+        for (const u of Object.values(data.users)) {
+            if (u.login.toLowerCase().includes(cleanQ)) {
+                matches.push({ type: 'user', login: u.login, name: u.login, avatar: u.avatar, x: u.cx, y: u.cy, cx: u.cx, cy: u.cy });
+                if (matches.length >= 10) break;
+            }
         }
-
-        return searchBackendTrie(sandboxTrie, lowerQ);
+        for (const r of data.repos) {
+            if (r.name.toLowerCase().includes(cleanQ)) {
+                const u = data.users[r.login] || { avatar: null, cx: 0, cy: 0 };
+                matches.push({
+                    type: 'repo', id: r.name, login: r.login, name: r.name, language: r.language, url: r.url,
+                    size: r.size, stars: r.stars, isFork: r.isfork, description: r.description, updatedAt: r.updated_at, x: r.x, y: r.y, radius: r.radius,
+                    avatar: u.avatar, cx: u.cx, cy: u.cy
+                });
+                if (matches.length >= 20) break;
+            }
+        }
+        return matches;
     }
     if (!isSandbox) {
-        // Fast prefix search (hits BTREE index)
         const usersRes = await pool.query(`SELECT login, avatar, cx, cy FROM users WHERE login ILIKE $1 LIMIT 10`, [q]);
         const reposRes = await pool.query(`
             SELECT r.name, r.language, r.url, r.login, r.size, r.stars, r.isfork, r.description, r.updated_at, r.x, r.y, r.radius, u.avatar, u.cx, u.cy 
@@ -744,7 +700,7 @@ async function searchGlobal(query) {
     }
 }
 
-// Session cleanup — delete sessions older than 24 hours, every hour
+// Session cleanup — delete sessions older than 24h
 setInterval(() => {
     if (isSandbox) {
         try {
@@ -797,8 +753,6 @@ async function findFreeSpot(startX, startY, minDistance = 2000) {
             y = startY + Math.sin(angle) * radius;
         }
     }
-    // Load existing coordinates into memory ONCE to avoid spamming the DB pool 
-    // with sequential SELECT queries inside a while loop, which causes massive lag
     const res = await pool.query('SELECT cx, cy FROM users');
     const existingUsers = res.rows;
 
@@ -813,7 +767,6 @@ async function findFreeSpot(startX, startY, minDistance = 2000) {
         }
         if (!collision) return { x, y };
         step++;
-        // Use golden angle spiral to pack users much faster and denser
         const angle = step * 2.39996; 
         const radius = Math.sqrt(step) * 1000;
         x = startX + Math.cos(angle) * radius;

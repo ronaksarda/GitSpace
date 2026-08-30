@@ -5,7 +5,6 @@
 #include <iomanip>
 #include "SpatialEngine.h"
 
-// Helper to escape JSON strings
 std::string escapeJSON(const std::string& input) {
     std::ostringstream ss;
     for (char c : input) {
@@ -28,20 +27,16 @@ int main() {
     std::string line;
     if (!std::getline(std::cin, line)) return 0;
 
-    // First line is center coordinates: X Y
+    // Line 1: center coordinates (X Y)
     double cx = 0, cy = 0;
     std::stringstream ss(line);
     ss >> cx >> cy;
 
-    // Bounding box for Quadtree
-    // It will adapt to any size, starting huge:
     BoundingBox worldBox{-1e9, -1e9, 1e9, 1e9};
     Quadtree tree(worldBox, 0);
-
-    // We will allocate memory for nodes
     std::vector<std::unique_ptr<BaseProject>> projects;
 
-    // Read TSV: STARS \t SIZE \t IS_FORK \t LANGUAGE \t NAME \t URL
+    // Read TSV lines: stars, size, isFork, language, name, url
     while (std::getline(std::cin, line)) {
         if (line.empty()) continue;
 
@@ -60,7 +55,6 @@ int main() {
         if (std::getline(ls, token, '\t')) url = token;
 
         std::unique_ptr<BaseProject> proj;
-        // Determine type based on language
         if (language == "C++" || language == "Rust" || language == "C" || language == "Go" || language == "Java" || language == "C#") {
             proj = std::make_unique<FrameworkNode>(name, stars, language, url, size, isFork, cx, cy);
         } else {
@@ -72,7 +66,6 @@ int main() {
         projects.push_back(std::move(proj));
     }
 
-    // Output JSON
     std::cout << "[\n";
     for (size_t i = 0; i < projects.size(); ++i) {
         auto& p = projects[i];

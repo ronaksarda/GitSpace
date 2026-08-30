@@ -9,10 +9,7 @@
 #include <cstdint>
 #include <random>
 
-/**
- * @brief High-performance contiguous memory allocation pool.
- * Eliminates runtime heap allocation overhead and prevents memory fragmentation.
- */
+// Arena allocator for fast node allocations
 class MemoryArena {
 private:
     uint8_t* m_buffer = nullptr;
@@ -28,13 +25,9 @@ public:
         delete[] m_buffer;
     }
 
-    // Disable copying
     MemoryArena(const MemoryArena&) = delete;
     MemoryArena& operator=(const MemoryArena&) = delete;
 
-    /**
-     * @brief Allocates bytes from the contiguous pool with alignment safety.
-     */
     void* allocate(size_t bytes, size_t alignment = alignof(std::max_align_t)) {
         std::uintptr_t current_ptr = reinterpret_cast<std::uintptr_t>(m_buffer + m_offset);
         std::uintptr_t aligned_ptr = (current_ptr + alignment - 1) & ~(alignment - 1);
@@ -47,18 +40,12 @@ public:
         return reinterpret_cast<void*>(m_buffer + new_offset);
     }
 
-    /**
-     * @brief Constructs an object inside the contiguous pool memory.
-     */
     template<typename T, typename... Args>
     T* create(Args&&... args) {
         void* ptr = allocate(sizeof(T), alignof(T));
         return new (ptr) T(std::forward<Args>(args)...);
     }
 
-    /**
-     * @brief Resets the offset index, invalidating all allocations.
-     */
     void reset() {
         m_offset = 0;
     }
@@ -72,9 +59,7 @@ public:
     }
 };
 
-/**
- * @brief Abstract Base Class for visual projects.
- */
+// Base class for island repo nodes
 class BaseProject {
 public:
     std::string name;
@@ -93,43 +78,31 @@ public:
 
     virtual ~BaseProject() = default;
 
-    /**
-     * @brief Computes the node's visual landmass footprint.
-     */
     virtual void computeLandMass() = 0;
 };
 
-/**
- * @brief Represents framework, compiler, engine, or compiled library nodes.
- */
+// Compiled/heavy project node
 class FrameworkNode : public BaseProject {
 public:
     using BaseProject::BaseProject;
 
     void computeLandMass() override {
-        // Framework components get a slightly larger footprint for stability mapping.
         radius = 6.0 + std::sqrt(static_cast<double>(stars)) * 0.16 + std::sqrt(static_cast<double>(size)) * 0.05;
         if (radius > 18.0) radius = 18.0;
     }
 };
 
-/**
- * @brief Represents scripting packages, light utils, or script nodes.
- */
+// Script/light project node
 class ScriptNode : public BaseProject {
 public:
     using BaseProject::BaseProject;
 
     void computeLandMass() override {
-        // Script components get a slightly smaller footprint.
         radius = 3.0 + std::sqrt(static_cast<double>(stars)) * 0.10 + std::sqrt(static_cast<double>(size)) * 0.03;
         if (radius > 18.0) radius = 18.0;
     }
 };
 
-/**
- * @brief Simple 2D bounding box.
- */
 struct BoundingBox {
     double xmin;
     double ymin;
@@ -145,9 +118,7 @@ struct BoundingBox {
     }
 };
 
-/**
- * @brief Spatial partitioning Quadtree with dynamic coordinate shifting collision resolution.
- */
+// 2D Quadtree with spiral collision resolution
 class Quadtree {
 private:
     static constexpr int MAX_CAPACITY = 16;
@@ -191,9 +162,6 @@ private:
 public:
     Quadtree(BoundingBox boundary, int depth = 0) : m_boundary(boundary), m_depth(depth) {}
 
-    /**
-     * @brief Inserts a node directly into the Quadtree structure.
-     */
     bool insert(BaseProject* proj) {
         if (!m_boundary.contains(proj->x, proj->y)) {
             return false;
@@ -210,9 +178,6 @@ public:
         return insertIntoChildren(proj);
     }
 
-    /**
-     * @brief Queries the quadtree for all projects inside a bounding box.
-     */
     void query(double xmin, double ymin, double xmax, double ymax, std::vector<BaseProject*>& found) const {
         BoundingBox searchBox{xmin, ymin, xmax, ymax};
         if (!m_boundary.intersects(searchBox)) {
@@ -233,9 +198,6 @@ public:
         }
     }
 
-    /**
-     * @brief Detects collisions and shifts coordinates to open adjacent spaces prior to insertion.
-     */
     void insertWithCollisionResolution(BaseProject* proj) {
         double original_x = proj->x;
         double original_y = proj->y;
@@ -264,15 +226,13 @@ public:
 
             if (has_collision) {
                 attempts++;
-                // Spiral outwards in a golden ratio-like rotation pattern
                 double r = step * std::sqrt(static_cast<double>(attempts));
-                angle += 0.38197; // 2.39996 radians (Golden angle approximation)
+                angle += 0.38197; // Golden angle step
                 proj->x = original_x + r * std::cos(angle);
                 proj->y = original_y + r * std::sin(angle);
             }
         }
 
-        // Insert cleanly inside the quadtree grid space
         insert(proj);
     }
 };

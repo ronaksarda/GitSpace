@@ -1,4 +1,3 @@
-// ── Onboarding Tour (Feature 12) ─────────────────────
 (function() {
   const TOUR_KEY = 'gitspace_tour_completed';
 
@@ -42,7 +41,7 @@
   function completeTour() {
     try {
       localStorage.setItem(TOUR_KEY, 'true');
-    } catch (e) { /* silent */ }
+    } catch (e) { }
     cleanup();
   }
 
@@ -63,7 +62,6 @@
     const step = tourSteps[index];
     const targetEl = document.querySelector(step.target);
     if (!targetEl) {
-      // Skip missing elements
       currentStep++;
       showStep(currentStep);
       return;
@@ -71,7 +69,6 @@
 
     const rect = targetEl.getBoundingClientRect();
 
-    // Create overlay
     const overlay = document.createElement('div');
     overlay.id = 'tour-overlay';
     overlay.innerHTML = `
@@ -108,7 +105,7 @@
 
   function getTooltipPosition(rect, position) {
     const pad = 16;
-    const tooltipWidth = 320; // approximate max-width + padding
+    const tooltipWidth = 320;
     
     let top = 'auto', bottom = 'auto', left = 'auto', right = 'auto';
 
@@ -134,7 +131,7 @@
         left = rect.left;
     }
 
-    // Clamp values to screen bounds
+    // Clamp inside viewport
     if (left !== 'auto') left = Math.max(10, Math.min(window.innerWidth - tooltipWidth - 10, left));
     if (right !== 'auto') right = Math.max(10, Math.min(window.innerWidth - tooltipWidth - 10, right));
     if (top !== 'auto' && typeof top === 'number') top = Math.max(10, Math.min(window.innerHeight - 150, top));
@@ -149,18 +146,16 @@
     return style;
   }
 
-  // Initialize after a delay to let HUD render
   window.initTour = function() {
     if (shouldShowTour()) {
       setTimeout(() => showStep(0), 1500);
     }
   };
 
-  // Allow explicit restart
   window.startTour = function() {
     try {
       localStorage.removeItem(TOUR_KEY);
-    } catch (e) { /* silent */ }
+    } catch (e) { }
     currentStep = 0;
     showStep(0);
   };

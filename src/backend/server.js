@@ -6,7 +6,7 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 
 const app = express();
-app.set('trust proxy', 1); // Trust first proxy for rate limiting (Railway/Heroku/Vercel)
+app.set('trust proxy', 1);
 app.use(compression());
 const PORT = process.env.PORT || 3000;
 const CLIENT_ID = process.env.GITHUB_CLIENT_ID;
@@ -14,11 +14,10 @@ const CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 const APP_URL = process.env.APP_URL || `http://localhost:${PORT}`;
 const CALLBACK_URL = `${APP_URL}/auth/callback`;
 
-// ── Rate Limiters ────────────────────────────────────
 const isDev = process.env.NODE_ENV !== 'production';
 
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: 15 * 60 * 1000,
     max: isDev ? 100000 : 10000,
     standardHeaders: true,
     legacyHeaders: false,
@@ -41,7 +40,7 @@ const heavyLimiter = rateLimit({
     message: { error: 'Rate limit exceeded for this resource. Try again later.' }
 });
 
-// ── Security Headers ───────────────────────────────────
+// Security headers
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -54,7 +53,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// Serve static frontend files with cache headers
+// Static files
 app.use(express.static(path.join(__dirname, '../../public'), {
     etag: true,
     lastModified: true,
@@ -62,7 +61,6 @@ app.use(express.static(path.join(__dirname, '../../public'), {
         if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         } else if (filePath.match(/\.(js|css)$/)) {
-            // Versioned via ?v= query params — cache aggressively
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         } else {
             res.setHeader('Cache-Control', 'public, max-age=86400');
@@ -70,12 +68,9 @@ app.use(express.static(path.join(__dirname, '../../public'), {
     }
 }));
 
-// Basic JSON parser with explicit size limit
 app.use(express.json({ limit: '16kb' }));
 
-
-
-// Health check endpoint for Railway
+// Health check
 app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
@@ -84,7 +79,7 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Shareable User Links Route — validate login format
+// User link redirect
 app.get('/u/:login', apiLimiter, async (req, res) => {
     const login = req.params.login;
     if (!/^[A-Za-z0-9_.-]{1,39}$/.test(login)) {
@@ -99,7 +94,7 @@ app.get('/u/:login', apiLimiter, async (req, res) => {
     }
 });
 
-// Routers — apply rate limiters
+// Routers
 app.use('/auth', authLimiter);
 app.use('/api', apiLimiter);
 app.use('/', require('./routes/auth')(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL));
@@ -115,7 +110,7 @@ app.use((req, res) => {
     <body><div class="c"><h1>404</h1><p>Lost in deep space.</p><a href="/">Return to GitSpace</a></div></body></html>`);
 });
 
-// Global Error Handler
+// Global error handler
 app.use((err, req, res, next) => {
     console.error('[Express] Unhandled error:', err);
     res.status(500).json({ error: 'Internal Server Error' });
