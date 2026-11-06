@@ -95,7 +95,11 @@ function findIslandAtPoint(mx, my) {
     const isy = canvas.height / 2 + (island.cy - camera.y) * camera.zoom;
     const dx = mx - isx;
     const dy = my - isy;
-    if (Math.sqrt(dx * dx + dy * dy) < (40 * camera.zoom + 15)) {
+    // Anywhere on the island counts: the grass disc or the rock underneath it.
+    const r = island.islandRadius * camera.zoom;
+    const onTop = dx * dx + dy * dy < r * r * 1.1;
+    const onRock = dy > 0 && dy < r * 1.55 && Math.abs(dx) < r * (1 - dy / (r * 1.55));
+    if (onTop || onRock) {
       return island;
     }
   }

@@ -121,10 +121,15 @@
     sign.href = '/auth/github';
     var explore = el('button', 'gsl-btn gsl-btn-quiet', 'Explore first');
     explore.type = 'button';
+    // Signed-in people open this from the menu; for them both buttons just return to the map.
+    sign.addEventListener('click', function (e) {
+      if (window.currentUserLogin) { e.preventDefault(); window.hideLanding(); }
+    });
     explore.addEventListener('click', function () {
       window.hideLanding();
-      if (window.startGuestExplore) window.startGuestExplore();
+      if (!window.currentUserLogin && window.startGuestExplore) window.startGuestExplore();
     });
+    row.dataset.gslActions = '1';
     row.appendChild(sign);
     row.appendChild(explore);
     return row;
@@ -187,6 +192,9 @@
     if (window.stopAttractMode) window.stopAttractMode();
     if (!root) build();
     root.hidden = false;
+    var signedIn = !!window.currentUserLogin;
+    root.querySelectorAll('.gsl-btn-primary').forEach(function (b) { b.textContent = signedIn ? 'Back to the map' : 'Sign in with GitHub'; });
+    root.querySelectorAll('.gsl-btn-quiet').forEach(function (b) { b.hidden = signedIn; });
     root.scrollTop = 0;
     active = -1;
     window.addEventListener('keydown', holdKeys, true);

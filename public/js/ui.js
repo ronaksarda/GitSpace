@@ -489,6 +489,7 @@ function onMenuSelect(e) {
   closeRing();
   if (v === 'home') return flyHome();
   if (v === 'map') { window.mapExpanded = true; return; }
+  if (v === 'howto') { window.showLanding && window.showLanding(); return; }
   if (v === 'speed') { openRing(); setTimeout(() => document.getElementById('ring-speed-btn')?.click(), 60); return; }
   if (v === 'citizens') window.toggleCitizens();
   else if (v === 'radar') window.openRepoRadar();
