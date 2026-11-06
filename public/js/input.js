@@ -10,10 +10,14 @@ window.addEventListener('keydown', e => {
   keys[key] = true;
 
   // Shortcuts overlay toggle
-  if (key === '?' || key === '/' || (key === 'h' && !e.ctrlKey)) {
+  if (key === '?' || (key === 'h' && !e.ctrlKey)) {
     toggleShortcutsOverlay();
     return;
   }
+
+  // Big map toggle
+  if (key === 'm') { window.mapExpanded = !window.mapExpanded; return; }
+  if (key === 'escape' && window.mapExpanded) { window.mapExpanded = false; return; }
 
   // Screenshot
   if (key === 'p') {
@@ -35,7 +39,6 @@ window.addEventListener('keydown', e => {
     document.getElementById('repo-modal')?.classList.add('hidden');
     document.getElementById('profile-modal')?.classList.add('hidden');
     document.getElementById('citizens-sidebar')?.classList.add('hidden');
-    document.getElementById('achievements-sidebar')?.classList.add('hidden');
     hideShortcutsOverlay();
   }
 });
@@ -50,9 +53,10 @@ window.addEventListener('blur', () => {
 
 // Zoom
 window.addEventListener('wheel', e => {
+  if (e.target !== canvas) return; // let dialogs and lists scroll normally
   e.preventDefault();
   const zoomDelta = e.deltaY > 0 ? 0.9 : 1.1;
-  camera.zoom = Math.max(0.1, Math.min(2.5, camera.zoom * zoomDelta));
+  targetCamera.zoom = Math.max(0.1, Math.min(2.5, targetCamera.zoom * zoomDelta));
 }, { passive: false });
 
 canvas.addEventListener('mousedown', e => {
@@ -102,51 +106,11 @@ canvas.addEventListener('mouseup', e => {
   if (e.button === 0) {
     const mx = e.clientX;
     const my = e.clientY;
+    if (window.minimapClick && window.minimapClick(mx, my)) return;
 
     const hit = findBuildingAtPoint(mx, my);
     if (hit && hit.building) {
-      const b = hit.building;
-
-      document.getElementById('rm-name').textContent = b.name;
-      document.getElementById('rm-lang').textContent = b.language + (b.isFork ? ' (Fork)' : '');
-      document.getElementById('rm-stars').textContent = '⭐ ' + (b.stars || 0).toLocaleString();
-
-      const rmDesc = document.getElementById('rm-description');
-      if (rmDesc) rmDesc.textContent = b.description || 'No description provided.';
-
-      const rmSize = document.getElementById('rm-size');
-      if (rmSize) rmSize.textContent = formatSize(b.size);
-
-      const rmUpdated = document.getElementById('rm-updated');
-      if (rmUpdated) rmUpdated.textContent = b.updatedAt ? timeAgo(b.updatedAt) : 'Unknown';
-
-      const rmSizeBar = document.getElementById('rm-size-fill');
-      if (rmSizeBar) {
-        const maxSize = 100000;
-        const pct = Math.min(100, (b.size / maxSize) * 100);
-        rmSizeBar.style.width = pct + '%';
-      }
-
-      const rmAccent = document.getElementById('rm-lang-accent');
-      if (rmAccent) rmAccent.style.backgroundColor = langColor(b.language);
-
-      document.getElementById('rm-btn').onclick = () => {
-        if (b.url) window.open(b.url, '_blank');
-      };
-      document.getElementById('repo-modal').classList.remove('hidden');
-
-      if (window.unlockAchievement) {
-        if (!window.inspectedRepos) window.inspectedRepos = new Set();
-        window.inspectedRepos.add(b.name);
-        if (window.inspectedRepos.size >= 10) window.unlockAchievement('architect');
-
-        if (b.stars >= 1000) window.unlockAchievement('stargazer');
-        if (b.size >= 100000) window.unlockAchievement('collector');
-
-        if (['C', 'C++', 'Rust'].includes(b.language)) window.unlockAchievement('sys_architect');
-        if (['Python'].includes(b.language)) window.unlockAchievement('ai_pioneer');
-        if (['JavaScript', 'TypeScript', 'HTML'].includes(b.language)) window.unlockAchievement('frontend_master');
-      }
+      openModalForItem({ ...hit.building, type: 'repo', login: hit.island.login });
       return;
     }
 
@@ -205,29 +169,29 @@ function captureScreenshot() {
     link.download = `gitspace_${Date.now()}.png`;
     link.href = tempCanvas.toDataURL('image/png');
     link.click();
-    showToast('📸 Screenshot saved!');
+    showToast('Screenshot saved');
   } catch (err) {
-    showToast('Screenshot failed — try again');
+    showToast('Screenshot failed. Try again.');
   }
 }
 
 function showProfileModal(island) {
-  document.getElementById('pm-avatar').src = island.avatar || 'https://github.com/identicons/' + island.login + '.png';
+  document.getElementById('pm-avatar').src = island.avatar || 'https://avatars.githubusercontent.com/' + encodeURIComponent(island.login) + '?s=80';
   document.getElementById('pm-name').textContent = island.login;
-  document.getElementById('pm-repos').textContent = island.repoCount + ' Repositories';
-  document.getElementById('pm-stars').textContent = '⭐ ' + (island.totalStars || 0).toLocaleString();
+  document.getElementById('pm-repos').textContent = island.repoCount + (island.repoCount === 1 ? ' repo' : ' repos');
+  document.getElementById('pm-stars').textContent = (island.totalStars || 0).toLocaleString() + ' stars';
 
   const topReposEl = document.getElementById('pm-top-repos');
   if (topReposEl) {
     const sorted = [...island.buildings].sort((a, b) => b.stars - a.stars).slice(0, 5);
     if (sorted.length === 0) {
-      topReposEl.innerHTML = '<div class="pm-repo-item" style="color: #666; font-style: italic; justify-content: center;">No repositories to display</div>';
+      topReposEl.innerHTML = '<div class="pm-repo-item muted">No public repos yet</div>';
     } else {
       topReposEl.innerHTML = sorted.map(r =>
         `<div class="pm-repo-item">
           <span class="pm-repo-dot" style="background:${langColor(r.language)}"></span>
           <span class="pm-repo-name">${escapeHTML(r.name)}</span>
-          <span class="pm-repo-stars">⭐ ${r.stars}</span>
+          <span class="pm-repo-stars">${(r.stars || 0).toLocaleString()} stars</span>
         </div>`
       ).join('');
     }
@@ -242,7 +206,7 @@ function showProfileModal(island) {
       const url = window.location.origin + '/?fly=' + encodeURIComponent(island.login);
       if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(url).then(() => {
-          if (window.showToast) window.showToast('🔗 Profile link copied!');
+          if (window.showToast) window.showToast('Profile link copied');
         }).catch(() => {
           if (window.showToast) window.showToast('Copy failed');
         });
@@ -257,7 +221,7 @@ function showProfileModal(island) {
         textArea.select();
         try {
           document.execCommand('copy');
-          if (window.showToast) window.showToast('🔗 Profile link copied!');
+          if (window.showToast) window.showToast('Profile link copied');
         } catch (err) {
           if (window.showToast) window.showToast('Copy failed');
         }
@@ -266,39 +230,7 @@ function showProfileModal(island) {
     };
   }
 
-  const badgesEl = document.getElementById('pm-badges');
-  if (badgesEl) {
-    if (island.badges && island.badges.length > 0) {
-      badgesEl.innerHTML = island.badges.map(b =>
-        `<div class="pm-badge" style="border-color:${b.borderColor}; background:${b.bgColor}" title="${escapeHTML(b.label)}">${b.icon}</div>`
-      ).join('');
-      badgesEl.style.display = 'flex';
-    } else {
-      badgesEl.style.display = 'none';
-    }
-  }
-
   document.getElementById('profile-modal').classList.remove('hidden');
-
-  if (window.unlockAchievement) {
-    if (island.repoCount > 50) {
-      window.unlockAchievement('mentor_seeker');
-    }
-
-    if (window.currentUserLogin && window.currentUserLogin !== island.login && window.myPrimaryLanguage) {
-      if (window.myPrimaryLanguage === island.primaryLanguage) {
-        window.unlockAchievement('birds_of_feather');
-      }
-    }
-
-    if (!window.visitedLangs) window.visitedLangs = new Set();
-    if (island.primaryLanguage && island.primaryLanguage !== 'Unknown') {
-      window.visitedLangs.add(island.primaryLanguage);
-      if (window.visitedLangs.size >= 3) {
-        window.unlockAchievement('cross_pollination');
-      }
-    }
-  }
 
   document.getElementById('pm-btn-github').onclick = () => window.open('https://github.com/' + island.login, '_blank');
   document.getElementById('pm-btn-travel').onclick = () => {
@@ -306,7 +238,6 @@ function showProfileModal(island) {
     document.getElementById('citizens-sidebar').classList.add('hidden');
     flyTo(island.cx, island.cy, null);
   };
-  document.getElementById('profile-modal').classList.remove('hidden');
 }
 
 function drawLanguagePie(buildings) {
@@ -331,7 +262,7 @@ function drawLanguagePie(buildings) {
   const legendEl = document.getElementById('pm-pie-legend');
   
   if (total === 0) {
-    if (legendEl) legendEl.innerHTML = '<div class="pie-legend-item" style="color: #666; font-style: italic; justify-content: center;">No repos</div>';
+    if (legendEl) legendEl.innerHTML = '<div class="pie-legend-item muted">No repos</div>';
     return;
   }
 
@@ -352,23 +283,23 @@ function drawLanguagePie(buildings) {
   // Center cutout
   pctx.beginPath();
   pctx.arc(cx, cy, radius * 0.55, 0, Math.PI * 2);
-  pctx.fillStyle = 'rgba(10,10,26,0.95)';
+  pctx.fillStyle = '#FFF4E6';
   pctx.fill();
 
-  pctx.fillStyle = '#ffffff';
-  pctx.font = 'bold 14px monospace';
+  pctx.fillStyle = '#2B2340';
+  pctx.font = '600 16px Rubik, sans-serif';
   pctx.textAlign = 'center';
   pctx.textBaseline = 'middle';
   pctx.fillText(total, cx, cy - 6);
-  pctx.fillStyle = '#8a8acc';
-  pctx.font = '9px monospace';
+  pctx.fillStyle = '#6B5E80';
+  pctx.font = '11px Rubik, sans-serif';
   pctx.fillText('repos', cx, cy + 8);
 
   if (legendEl) {
     legendEl.innerHTML = entries.slice(0, 6).map(([lang, count]) =>
       `<div class="pie-legend-item">
         <span class="pie-legend-dot" style="background:${langColor(lang)}"></span>
-        <span>${lang}</span>
+        <span>${escapeHTML(lang)}</span>
         <span class="pie-legend-pct">${Math.round(count / total * 100)}%</span>
       </div>`
     ).join('');
@@ -460,7 +391,7 @@ canvas.addEventListener('touchmove', e => {
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     const currentDistance = Math.sqrt(dx * dx + dy * dy);
     const zoomFactor = currentDistance / initialPinchDistance;
-    camera.zoom = Math.max(0.1, Math.min(2.5, initialZoom * zoomFactor));
+    camera.zoom = targetCamera.zoom = Math.max(0.1, Math.min(2.5, initialZoom * zoomFactor));
   }
 }, { passive: false });
 
@@ -472,20 +403,10 @@ canvas.addEventListener('touchend', e => {
     if (window.isDragging && touchDragDistance < 8) {
       const mx = lastMouse.x;
       const my = lastMouse.y;
+      if (window.minimapClick && window.minimapClick(mx, my)) { window.isDragging = false; previousTouch = null; window.touchJoystick = null; return; }
       const hit = findBuildingAtPoint(mx, my);
       if (hit && hit.building) {
-        const b = hit.building;
-        document.getElementById('rm-name').textContent = b.name;
-        document.getElementById('rm-lang').textContent = b.language + (b.isFork ? ' (Fork)' : '');
-        document.getElementById('rm-stars').textContent = '⭐ ' + (b.stars || 0).toLocaleString();
-        const rmDesc = document.getElementById('rm-description');
-        if (rmDesc) rmDesc.textContent = b.description || 'No description provided.';
-        const rmSize = document.getElementById('rm-size');
-        if (rmSize) rmSize.textContent = formatSize(b.size);
-        const rmUpdated = document.getElementById('rm-updated');
-        if (rmUpdated) rmUpdated.textContent = b.updatedAt ? timeAgo(b.updatedAt) : 'Unknown';
-        document.getElementById('rm-btn').onclick = () => { if (b.url) window.open(b.url, '_blank'); };
-        document.getElementById('repo-modal').classList.remove('hidden');
+        openModalForItem({ ...hit.building, type: 'repo', login: hit.island.login });
         
         window.isDragging = false;
         previousTouch = null;

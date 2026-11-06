@@ -62,7 +62,7 @@ async function init() {
       hud.style.display = 'block';
       document.getElementById('hud-avatar').style.display = 'inline-block';
       document.getElementById('btn-logout').style.display = 'inline-block';
-      document.getElementById('hud-avatar').src = user.avatar_url || user.avatar || `https://github.com/identicons/${user.login || user.name}.png`;
+      document.getElementById('hud-avatar').src = user.avatar_url || user.avatar || `https://avatars.githubusercontent.com/${encodeURIComponent(user.login || user.name)}?s=80`;
       document.getElementById('hud-name').textContent = user.login || user.name;
       window.currentUserLogin = user.login;
       
@@ -144,7 +144,7 @@ async function init() {
     const flyToLogin = params.get('fly');
     if (flyToLogin) {
       try {
-        const sRes = await fetch('/api/search?q=' + flyToLogin);
+        const sRes = await fetch('/api/search?q=' + encodeURIComponent(flyToLogin));
         const matches = await sRes.json();
         const target = matches.find(m => m.login === flyToLogin);
         if (target) {

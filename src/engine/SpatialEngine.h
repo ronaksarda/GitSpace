@@ -206,9 +206,10 @@ public:
         double angle = 0.0;
         double step = proj->radius * 0.8;
 
-        while (has_collision && attempts < 1000) {
+        while (has_collision && attempts < 10000) {
             has_collision = false;
-            double r_search = proj->radius * 2.5;
+            // widest possible overlap: own radius + max radius (18.0, see computeLandMass) + 5.0 gap
+            double r_search = proj->radius + 18.0 + 5.0;
             std::vector<BaseProject*> neighbors;
             query(proj->x - r_search, proj->y - r_search, proj->x + r_search, proj->y + r_search, neighbors);
 
@@ -227,7 +228,7 @@ public:
             if (has_collision) {
                 attempts++;
                 double r = step * std::sqrt(static_cast<double>(attempts));
-                angle += 0.38197; // Golden angle step
+                angle += 0.38197; // fixed spiral step (not the golden angle); changing it reshuffles every island
                 proj->x = original_x + r * std::cos(angle);
                 proj->y = original_y + r * std::sin(angle);
             }

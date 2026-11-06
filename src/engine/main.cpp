@@ -3,6 +3,7 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <cstdio>
 #include "SpatialEngine.h"
 
 std::string escapeJSON(const std::string& input) {
@@ -15,6 +16,11 @@ std::string escapeJSON(const std::string& input) {
         else if (c == '\n') ss << "\\n";
         else if (c == '\r') ss << "\\r";
         else if (c == '\t') ss << "\\t";
+        else if (static_cast<unsigned char>(c) < 0x20) {
+            char buf[8];
+            std::snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
+            ss << buf;
+        }
         else ss << c;
     }
     return ss.str();
@@ -32,7 +38,8 @@ int main() {
     std::stringstream ss(line);
     ss >> cx >> cy;
 
-    BoundingBox worldBox{-1e9, -1e9, 1e9, 1e9};
+    // Spiral never leaves ~1440 units of the centre (18 * 0.8 * sqrt(10000)); keep the tree local so it can subdivide
+    BoundingBox worldBox{cx - 5000, cy - 5000, cx + 5000, cy + 5000};
     Quadtree tree(worldBox, 0);
     std::vector<std::unique_ptr<BaseProject>> projects;
 
@@ -47,8 +54,13 @@ int main() {
         bool isFork = false;
         std::string language, name, url;
 
-        if (std::getline(ls, token, '\t')) stars = std::stoul(token);
-        if (std::getline(ls, token, '\t')) size = std::stoul(token);
+        try {
+            // stoll + clamp: stoul would wrap "-5" to ~4 billion
+            if (std::getline(ls, token, '\t')) stars = static_cast<uint32_t>(std::min<long long>(std::max(0LL, std::stoll(token)), UINT32_MAX));
+            if (std::getline(ls, token, '\t')) size = static_cast<uint32_t>(std::min<long long>(std::max(0LL, std::stoll(token)), UINT32_MAX));
+        } catch (const std::exception&) {
+            continue; // skip malformed row
+        }
         if (std::getline(ls, token, '\t')) isFork = (token == "1" || token == "true");
         if (std::getline(ls, token, '\t')) language = token;
         if (std::getline(ls, token, '\t')) name = token;
@@ -76,8 +88,8 @@ int main() {
                   << "    \"stars\": " << p->stars << ",\n"
                   << "    \"size\": " << p->size << ",\n"
                   << "    \"isFork\": " << (p->isFork ? "true" : "false") << ",\n"
-                  << "    \"x\": " << std::fixed << std::setprecision(2) << p->x << ",\n"
-                  << "    \"y\": " << std::fixed << std::setprecision(2) << p->y << ",\n"
+                  << "    \"x\": " << std::fixed << std::setprecision(4) << p->x << ",\n"
+                  << "    \"y\": " << std::fixed << std::setprecision(4) << p->y << ",\n"
                   << "    \"radius\": " << std::fixed << std::setprecision(2) << p->radius << "\n"
                   << "  }";
         if (i < projects.size() - 1) std::cout << ",";

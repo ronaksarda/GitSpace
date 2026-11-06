@@ -1,8 +1,8 @@
 const express = require('express');
-const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
+const { analyzeRepo, analyzeTree, calculateGrade } = require('../reviewer');
 const router = express.Router();
 
 let activeEngineProcesses = 0;
@@ -10,11 +10,12 @@ const MAX_ENGINE_PROCESSES = 4;
 
 const githubCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const CITIZENS_TTL_MS = 60 * 1000;
 
-function getCached(key) {
+function getCached(key, ttl = CACHE_TTL_MS) {
     const entry = githubCache.get(key);
     if (!entry) return null;
-    if (Date.now() - entry.ts > CACHE_TTL_MS) {
+    if (Date.now() - entry.ts > ttl) {
         githubCache.delete(key);
         return null;
     }
@@ -29,7 +30,7 @@ function setCache(key, data) {
     }
 }
 
-module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
+module.exports = function (db, heavyLimiter) {
     function getSessionId(req) {
         const match = req.headers.cookie?.match(/(?:^|;\s*)sid=([^;]+)/);
         return match ? match[1] : null;
@@ -41,12 +42,46 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
     }
 
     async function requireAuth(req, res, next) {
-        const session = await getSession(req);
-        if (!session || !session.token) {
-            return res.json({ authenticated: false });
+        try {
+            const session = await getSession(req);
+            if (!session || !session.token) {
+                return res.json({ authenticated: false });
+            }
+            req.session = session;
+        } catch (err) {
+            console.error('[API] requireAuth error:', err.message);
+            return res.status(500).json({ error: 'Internal error' });
         }
-        req.session = session;
         next();
+    }
+
+    const MAX_ISLAND_REPOS = 60;
+
+    // Pinned repo names via GraphQL (needs the user's token). Empty on any failure.
+    async function fetchPinnedNames(token) {
+        if (!token || token === 'mock_token') return [];
+        try {
+            const r = await fetch('https://api.github.com/graphql', {
+                method: 'POST',
+                headers: { 'Authorization': `bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: '{ viewer { pinnedItems(first: 6, types: REPOSITORY) { nodes { ... on Repository { name } } } } }' }),
+            });
+            if (!r.ok) return [];
+            const j = await r.json();
+            return (j?.data?.viewer?.pinnedItems?.nodes || []).map(n => n && n.name).filter(Boolean);
+        } catch (e) { return []; }
+    }
+
+    // Big accounts show their best repos only: pinned first, then stars, then forks, then most recent push.
+    function pickIslandRepos(repos, pinned = []) {
+        if (repos.length <= MAX_ISLAND_REPOS) return repos;
+        const pin = new Set(pinned);
+        return [...repos].sort((a, b) =>
+            (pin.has(b.name) - pin.has(a.name)) ||
+            ((b.stargazers_count || 0) - (a.stargazers_count || 0)) ||
+            ((b.forks_count || 0) - (a.forks_count || 0)) ||
+            (new Date(b.pushed_at || 0) - new Date(a.pushed_at || 0))
+        ).slice(0, MAX_ISLAND_REPOS);
     }
 
     async function githubFetch(url, token) {
@@ -139,7 +174,7 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
             let angle = 0.0;
             const step = proj.radius * 0.8;
 
-            while (has_collision && attempts < 1000) {
+            while (has_collision && attempts < 10000) {
                 has_collision = false;
                 for (const other of placed) {
                     const dx = proj.x - other.x;
@@ -176,8 +211,11 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
 
         return { cx: baseX, cy: baseY, repos: scaledPlaced };
     }
+    router.generateLayoutJS = generateLayoutJS; // exposed for test/engine-parity.test.js
+    router.pickIslandRepos = pickIslandRepos; // exposed for test/pick-repos.test.js
 
     const engineQueue = [];
+    const MAX_ENGINE_QUEUE = 50;
 
     function processEngineQueue() {
         if (engineQueue.length === 0 || activeEngineProcesses >= MAX_ENGINE_PROCESSES) return;
@@ -186,7 +224,7 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
         task();
     }
 
-    function generateLayoutEngine(username, reposData, baseX, baseY) {
+    function generateLayoutEngine(reposData, baseX, baseY) {
         return new Promise((resolve) => {
             const sorted = [...reposData].sort((a, b) => a.name.localeCompare(b.name));
             
@@ -201,6 +239,7 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
 
             const executeEngine = () => {
                 let isResolved = false;
+                let timedOut = false;
 
                 const cleanup = () => {
                     if (!isResolved) {
@@ -215,6 +254,7 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 let err = '';
 
                 const timeout = setTimeout(() => {
+                    timedOut = true;
                     proc.kill();
                     cleanup();
                     console.warn('[Engine] C++ engine timed out, falling back to deterministic JS layout engine');
@@ -227,12 +267,14 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 proc.on('close', code => {
                     clearTimeout(timeout);
                     cleanup();
+                    if (timedOut) return;
                     if (code !== 0) {
                         console.warn('[Engine] C++ engine failed with code', code, 'error:', err, '- falling back to deterministic JS layout engine');
                         return resolve(generateLayoutJS(sorted, baseX, baseY));
                     }
                     try {
                         const result = JSON.parse(out);
+                        if (result.length !== sorted.length) throw new Error('engine skipped rows');
                         const scale = 3.5;
                         const reposWithMeta = result.map((p, idx) => {
                             const original = sorted[idx] || {};
@@ -256,6 +298,7 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 proc.on('error', e => {
                     clearTimeout(timeout);
                     cleanup();
+                    if (timedOut) return;
                     console.warn('[Engine] Process error:', e.message, '- falling back to JS engine');
                     resolve(generateLayoutJS(sorted, baseX, baseY));
                 });
@@ -273,11 +316,15 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 }
                 const inputData = inputLines.join('\n') + '\n';
 
+                proc.stdin.on('error', () => {}); // EPIPE if the engine dies early; 'close' handles fallback
                 proc.stdin.write(inputData);
                 proc.stdin.end();
             };
 
             if (activeEngineProcesses >= MAX_ENGINE_PROCESSES) {
+                if (engineQueue.length >= MAX_ENGINE_QUEUE) {
+                    return resolve(generateLayoutJS(sorted, baseX, baseY));
+                }
                 engineQueue.push(executeEngine);
             } else {
                 activeEngineProcesses++;
@@ -327,40 +374,50 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
                 if (cached && req.method === 'GET') {
                     reposData = cached;
                 } else {
-                    const rRes = await githubFetch('https://api.github.com/user/repos?per_page=100&sort=updated', req.session.token);
-                    if (!rRes.ok) {
-                        if (rRes.status === 401) {
-                            await db.deleteSession(req.session.sid);
-                            return res.json({ authenticated: false, expired: true });
+                    // Up to 3 pages (300 repos); bigger accounts keep their 300 most recently updated.
+                    reposData = [];
+                    for (let page = 1; page <= 3; page++) {
+                        const rRes = await githubFetch(`https://api.github.com/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner`, req.session.token);
+                        if (!rRes.ok) {
+                            if (rRes.status === 401) {
+                                await db.deleteSession(req.session.sid);
+                                return res.json({ authenticated: false, expired: true });
+                            }
+                            return res.status(rRes.status).json({ error: 'GitHub API error' });
                         }
-                        return res.status(rRes.status).json({ error: 'GitHub API error' });
+                        const pageData = await rRes.json();
+                        reposData.push(...pageData);
+                        if (pageData.length < 100) break;
                     }
-                    reposData = await rRes.json();
                     setCache(cacheKey, reposData);
                 }
             }
 
             const existingUser = await db.getUser(userData.login);
             let baseX, baseY;
+            // Layout is translation-invariant, so build it at the origin first to learn the island size.
+            if (reposData.length > MAX_ISLAND_REPOS) reposData = pickIslandRepos(reposData, await fetchPinnedNames(req.session.token));
+            const local = await generateLayoutEngine(reposData, 0, 0);
+            const spread = local.repos.reduce((m, r) => Math.max(m, Math.hypot(r.x, r.y)), 0);
             if (existingUser && existingUser.cx !== undefined && existingUser.cx !== null && existingUser.cy !== undefined && existingUser.cy !== null) {
                 baseX = existingUser.cx;
                 baseY = existingUser.cy;
             } else {
-                const hash = crypto.createHash('md5').update(userData.login).digest('hex');
-                const startX = (parseInt(hash.substring(0, 4), 16) % 20000) - 10000;
-                const startY = (parseInt(hash.substring(4, 8), 16) % 20000) - 10000;
-                const pos = await db.findFreeSpot(startX, startY);
+                // New islands spiral out from the centre so the map stays dense.
+                const startX = 0;
+                const startY = 0;
+                const pos = await db.findFreeSpot(startX, startY, spread);
                 baseX = pos.x;
                 baseY = pos.y;
             }
 
-            const layout = await generateLayoutEngine(userData.login, reposData, baseX, baseY);
+            const layout = { cx: baseX, cy: baseY, repos: local.repos.map(r => ({ ...r, x: r.x + baseX, y: r.y + baseY })) };
             await db.saveUserLayout(userData.login, layout.cx, layout.cy, userData.avatar_url, layout.repos);
 
             res.json({ success: true, cx: layout.cx, cy: layout.cy, repos: layout.repos });
         } catch (err) {
             console.error('[API] /repos error:', err.message);
-            res.status(500).json({ error: err.message || 'Internal error' });
+            res.status(500).json({ error: 'Internal error' });
         }
     });
 
@@ -372,6 +429,10 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
 
         if (isNaN(minX) || isNaN(minY) || isNaN(maxX) || isNaN(maxY)) {
             return res.status(400).json({ error: 'minX, minY, maxX, maxY must be valid numbers' });
+        }
+        // frontend asks for 4000x4000 chunks (CHUNK_SIZE in public/js/network.js)
+        if (maxX - minX > 20000 || maxY - minY > 20000) {
+            return res.status(400).json({ error: 'Requested area too large' });
         }
 
         try {
@@ -396,7 +457,12 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
         try {
             const limit = Math.min(parseInt(req.query.limit) || 50, 100);
             const offset = Math.min(parseInt(req.query.offset) || 0, 10000);
-            const list = await db.getCitizens(limit, offset);
+            const cacheKey = `citizens:${limit}:${offset}`;
+            let list = getCached(cacheKey, CITIZENS_TTL_MS);
+            if (!list) {
+                list = await db.getCitizens(limit, offset);
+                setCache(cacheKey, list);
+            }
             res.json(list);
         } catch (err) {
             console.error('[API] /api/citizens error:', err.message);
@@ -425,7 +491,47 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
         }
     });
 
-    router.get('/api/search', async (req, res) => {
+    // Public GitHub profile + profile README for the island card. Only for people on the map, cached 1 hour.
+    router.get('/api/profile/:login', heavyLimiter || ((req, res, next) => next()), async (req, res) => {
+        try {
+            const login = String(req.params.login || '');
+            if (!/^[a-z\d](?:[a-z\d-]{0,38})$/i.test(login)) return res.status(400).json({ error: 'Invalid username' });
+            const user = await db.getUser(login);
+            if (!user) return res.status(404).json({ error: 'This developer is not on the map yet.' });
+
+            const cacheKey = 'profile:' + login.toLowerCase();
+            const cached = getCached(cacheKey, 60 * 60 * 1000);
+            if (cached) return res.json(cached);
+
+            const session = await getSession(req);
+            const token = session?.token;
+            const uRes = await githubFetch(`https://api.github.com/users/${encodeURIComponent(login)}`, token);
+            if (uRes.status === 403 || uRes.status === 429) return res.status(503).json({ error: 'GitHub rate limit, try again in a few minutes.' });
+            if (!uRes.ok) return res.status(uRes.status === 404 ? 404 : 502).json({ error: 'Could not load this GitHub profile.' });
+            const u = await uRes.json();
+
+            let readme = null;
+            try {
+                const rRes = await fetch(`https://api.github.com/repos/${encodeURIComponent(login)}/${encodeURIComponent(login)}/readme`, {
+                    headers: { 'Accept': 'application/vnd.github.raw+json', ...(token && token !== 'mock_token' ? { 'Authorization': `token ${token}` } : {}) },
+                });
+                if (rRes.ok) readme = (await rRes.text()).slice(0, 20000);
+            } catch (e) { }
+
+            const data = {
+                login: u.login, name: u.name, avatar: u.avatar_url, bio: u.bio, company: u.company, location: u.location,
+                blog: u.blog, twitter: u.twitter_username, followers: u.followers, following: u.following,
+                publicRepos: u.public_repos, createdAt: u.created_at, htmlUrl: u.html_url, readme,
+            };
+            setCache(cacheKey, data);
+            res.json(data);
+        } catch (err) {
+            console.error('[API] /api/profile error:', err.message);
+            res.status(500).json({ error: 'Could not load this profile.' });
+        }
+    });
+
+    router.get('/api/search', heavyLimiter || ((req, res, next) => next()), async (req, res) => {
         const q = req.query.q;
         if (!q || q.length < 2) return res.json([]);
         try {
@@ -443,6 +549,149 @@ module.exports = function (db, CLIENT_ID, CLIENT_SECRET, heavyLimiter) {
             res.json({ x: 0, y: 0 });
         } catch (err) {
             res.json({ x: 0, y: 0 });
+        }
+    });
+
+    router.get('/api/review', heavyLimiter || ((req, res, next) => next()), async (req, res) => {
+        const repoParam = req.query.repo || req.query.q;
+        let owner = req.query.owner;
+        let name = req.query.name;
+        if ([repoParam, owner, name].some(v => v !== undefined && typeof v !== 'string')) {
+            return res.status(400).json({ error: 'repo, owner and name must be single strings' });
+        }
+
+        if (repoParam) {
+            const clean = repoParam.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/$/, '');
+            if (clean.includes('/')) {
+                const parts = clean.split('/');
+                owner = parts[0];
+                name = parts[1];
+            } else if (!name) {
+                name = clean;
+            }
+        }
+
+        if (!name) {
+            return res.status(400).json({ error: 'Repository name required (e.g. repo=owner/name)' });
+        }
+
+        const cacheKey = `review:${owner || 'unknown'}:${name}`;
+        const cached = getCached(cacheKey);
+        if (cached) {
+            return res.json(cached);
+        }
+
+        try {
+            const session = await getSession(req);
+            const token = session?.token;
+            let repoData = null;
+            let languagesData = {};
+            let treeData = null;
+
+            if (owner) {
+                const ghRes = await githubFetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`, token);
+                if (ghRes.status === 403 || ghRes.status === 429 || ghRes.status >= 500) {
+                    return res.status(503).json({ error: 'GitHub rate limit, try again later' });
+                }
+                if (ghRes.ok) {
+                    repoData = await ghRes.json();
+                    
+                    try {
+                        const langRes = await githubFetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/languages`, token);
+                        if (langRes.ok) languagesData = await langRes.json();
+                    } catch (e) { }
+                    try {
+                        const branch = encodeURIComponent(repoData.default_branch || 'HEAD');
+                        const treeRes = await githubFetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/git/trees/${branch}?recursive=1`, token);
+                        if (treeRes.ok) treeData = (await treeRes.json()).tree || null;
+                    } catch (e) { }
+                }
+            }
+
+            // Fallback: search local GitSpace database if not found on GitHub (needs owner + name)
+            if (!repoData && owner) {
+                const searchResults = await db.searchGlobal(name);
+                const localMatch = searchResults.find(r => r.type === 'repo' && r.name.toLowerCase() === name.toLowerCase() && r.login.toLowerCase() === owner.toLowerCase());
+
+                if (localMatch) {
+                    owner = owner || localMatch.login;
+                    name = localMatch.name;
+                    repoData = {
+                        name: localMatch.name,
+                        full_name: `${owner}/${localMatch.name}`,
+                        description: localMatch.description || '',
+                        language: localMatch.language || 'Other',
+                        stargazers_count: localMatch.stars || 0,
+                        forks_count: 0,
+                        open_issues_count: 0,
+                        size: localMatch.size || 1024,
+                        pushed_at: localMatch.updatedAt || new Date().toISOString(),
+                        html_url: localMatch.url || `https://github.com/${owner}/${localMatch.name}`,
+                        license: null,
+                        topics: []
+                    };
+                    languagesData[localMatch.language || 'Other'] = 10000;
+                }
+            }
+
+            // If mock token or demo mode fallback
+            if (!repoData && process.env.NODE_ENV !== 'production' && (token === 'mock_token' || (!owner && name.startsWith('mock-')))) {
+                owner = owner || 'demo';
+                repoData = {
+                    name,
+                    full_name: `${owner}/${name}`,
+                    description: 'Simulated high-performance space architecture',
+                    language: 'TypeScript',
+                    stargazers_count: 320,
+                    forks_count: 24,
+                    open_issues_count: 2,
+                    size: 8192,
+                    pushed_at: new Date().toISOString(),
+                    html_url: `https://github.com/${owner}/${name}`,
+                    license: { spdx_id: 'MIT' },
+                    topics: ['developer-tools', 'space', 'visualization']
+                };
+                languagesData = { 'TypeScript': 85000, 'CSS': 12000 };
+            }
+
+            if (!repoData) {
+                return res.status(404).json({ error: `Repository "${owner ? owner + '/' + name : name}" not found.` });
+            }
+
+            const analysis = analyzeRepo(repoData, languagesData);
+            if (treeData) {
+                const tree = analyzeTree(treeData);
+                analysis.insights = [...tree.insights, ...analysis.insights];
+                analysis.recommendations = [...tree.recommendations, ...analysis.recommendations.filter(r => !/Maintain current CI/.test(r))];
+                analysis.score = Math.max(0, Math.min(100, analysis.score + tree.delta));
+                analysis.grade = calculateGrade(analysis.score);
+                analysis.metrics.fileCount = tree.facts.fileCount;
+                const m = analysis.metrics;
+                analysis.verdict = [
+                    `${m.primaryLanguage} project with ${tree.facts.fileCount} files.`,
+                    tree.facts.testFiles ? `${tree.facts.testFiles} test files` + (tree.facts.ciFiles ? ' and CI.' : ', no CI.') : (tree.facts.ciFiles ? 'CI but no tests.' : 'No tests or CI.'),
+                    m.license === 'None' ? 'No license.' : `${m.license} license.`,
+                    `Last push ${m.daysSincePush} days ago.`,
+                ].join(' ');
+            }
+            const responseData = {
+                success: true,
+                repo: {
+                    owner: owner || repoData.owner?.login || 'unknown',
+                    name: repoData.name,
+                    fullName: repoData.full_name || `${owner}/${name}`,
+                    description: repoData.description || 'No description provided.',
+                    htmlUrl: repoData.html_url || `https://github.com/${owner}/${name}`,
+                    avatar: repoData.owner?.avatar_url || `https://github.com/identicons/${owner || name}.png`
+                },
+                analysis
+            };
+
+            setCache(cacheKey, responseData);
+            res.json(responseData);
+        } catch (err) {
+            console.error('[API] /review error:', err.message);
+            res.status(500).json({ error: 'Failed to complete repository review.' });
         }
     });
 

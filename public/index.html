@@ -1,44 +1,40 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="wa-light">
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-  <title>GitSpace — Explore the GitHub Universe</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GitSpace</title>
   <meta name="description"
-    content="GitSpace transforms GitHub repositories into an explorable 2D galaxy. Every developer's account is an island, every repo is a building. Fly through space and discover open source.">
-  <meta property="og:title" content="GitSpace — Explore the GitHub Universe">
+    content="Your GitHub, turned into a little floating island. Fly around and visit other developers.">
+  <meta property="og:title" content="GitSpace">
   <meta property="og:description"
-    content="Your GitHub repositories are a world. Every repo is a building. Every developer is an island.">
+    content="Your GitHub, turned into a little floating island. Fly around and visit other developers.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="GitSpace">
-  <meta name="twitter:description" content="Explore the GitHub universe as a 2D galaxy.">
-  <meta name="theme-color" content="#06b6d4">
+  <meta name="twitter:description" content="Your GitHub, turned into a little floating island.">
+  <meta name="theme-color" content="#1E1B3A">
   <link rel="icon" type="image/png" href="logo.png?v=28">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://avatars.githubusercontent.com">
   <link
-    href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Rubik:wght@400;500;600&display=swap"
     rel="stylesheet">
+  <!-- Web Awesome components (accessible web components), themed to our tokens in style.css -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@awesome.me/webawesome@3.14.0/dist-cdn/styles/webawesome.css">
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@awesome.me/webawesome@3.14.0/dist-cdn/webawesome.loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
   <style>
-    body { margin: 0; overflow: hidden; touch-action: none; }
+    body { margin: 0; overflow: hidden; touch-action: none; background: #1E1B3A; }
     canvas { display: block; touch-action: none; }
+    /* Hide components until Web Awesome has defined them, so nothing flashes unstyled */
+    :not(:defined) { visibility: hidden; }
   </style>
-  <link rel="stylesheet" href="style.css?v=32">
-  <script>
-    // Security & Anti-Inspect Obfuscation
-    document.addEventListener('contextmenu', e => e.preventDefault());
-    document.addEventListener('keydown', e => {
-      if (e.key === 'F12' ||
-        (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key)) ||
-        (e.ctrlKey && e.key === 'u')) {
-        e.preventDefault();
-      }
-    });
-
-  </script>
+  <link rel="stylesheet" href="style.css?v=66">
+  <link rel="stylesheet" href="css/landing.css?v=1">
 </head>
 
 <body>
@@ -47,243 +43,260 @@
   <!-- Loading screen -->
   <div id="loading">
     <div class="loading-inner">
-      <div class="loading-logo">
-        <img src="logo.png?v=27" alt="GitSpace Logo" style="width: 100%; height: 100%; object-fit: contain;" />
-      </div>
       <div class="loading-title">GitSpace</div>
-      <div class="loading-sub">Initializing the universe...</div>
-      <div class="loading-bar">
-        <div class="loading-fill" id="loadfill"></div>
-      </div>
+      <div class="loading-sub">Loading the islands</div>
+      <div class="loading-bar"><div class="loading-fill" id="loadfill"></div></div>
     </div>
   </div>
 
   <!-- Error screen -->
-  <div id="error-screen" class="hidden">
-    <div class="error-inner">
-      <div class="error-icon">⚠️</div>
-      <h2>Something went wrong</h2>
-      <p id="error-message">An unexpected error occurred.</p>
-      <button class="btn-primary" onclick="window.location.reload()">Reload</button>
-    </div>
-  </div>
+  <wa-dialog id="error-screen" class="hidden" label="Something went wrong">
+    <p id="error-message">An unexpected error occurred.</p>
+    <p class="muted">Reloading the page usually fixes it.</p>
+    <wa-button slot="footer" variant="brand" onclick="window.location.reload()">Reload</wa-button>
+  </wa-dialog>
 
   <!-- Offline banner -->
-  <div id="offline-banner" class="hidden">
-    <span>⚡ Connection lost — chunks paused</span>
-  </div>
+  <wa-callout id="offline-banner" class="hidden" variant="warning" role="status">
+    <strong>Connection lost.</strong> New islands will load when you are back online.
+  </wa-callout>
 
-  <!-- Toast notification -->
-  <div id="toast-notification" class="hidden"></div>
+  <!-- Toasts: bottom-center stack -->
+  <ol id="toast-notification" aria-live="polite" aria-label="Notifications"></ol>
 
-  <!-- HUD -->
+  <!-- HUD: no chrome. Everything hangs off the ship. -->
   <div id="hud" style="display:none">
-    <div id="hud-tl">
-      <div class="hud-logo">GITSPACE</div>
-      <div class="hud-version">v2.0</div>
-      <button id="btn-citizens" class="btn-secondary">Citizens Directory</button>
-      <button id="btn-achievements" class="btn-secondary" onclick="window.toggleAchievements()">Achievements</button>
-    </div>
-    <div id="hud-tr">
-      <div id="speed-control">
-        <span class="speed-label">Speed</span>
-        <input type="range" id="speed-slider" min="5" max="50" value="12">
-      </div>
-      <button id="btn-sync" class="btn-primary" style="display:none;">Sync Island</button>
-      <img id="hud-avatar" src="" alt="" style="cursor:pointer;" title="Go to my island">
-      <span id="hud-name" style="cursor:pointer;" title="Go to my island"></span>
-      <button id="btn-logout" class="btn-secondary">Sign Out</button>
-      <!-- Mobile hamburger -->
-      <button id="btn-mobile-menu" class="btn-secondary mobile-only" style="padding: 4px 8px;">☰</button>
-    </div>
-    <!-- Mobile dropdown -->
-    <div id="mobile-menu-dropdown" class="hidden">
-      <button id="btn-citizens-m" class="btn-secondary" onclick="window.toggleCitizens()">Citizens</button>
-      <button id="btn-achievements-m" class="btn-secondary" onclick="window.toggleAchievements()">Achievements</button>
-      <button id="btn-sync-m" class="btn-primary" onclick="document.getElementById('btn-sync').click()">Sync</button>
-      <button class="btn-secondary" onclick="window.logout()">Sign Out</button>
-    </div>
+    <div id="hud-tl"><div class="hud-logo">GitSpace</div></div>
+
+    <!-- Menu (top right). Same actions as the ship ring, for people who look for a menu. -->
+    <wa-dropdown id="top-menu" placement="bottom-end" distance="10">
+      <button slot="trigger" id="top-menu-btn" type="button" aria-label="Menu">
+        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <wa-dropdown-item value="home">My island</wa-dropdown-item>
+      <wa-dropdown-item value="map">Map</wa-dropdown-item>
+      <wa-dropdown-item value="speed">Ship speed</wa-dropdown-item>
+      <wa-divider></wa-divider>
+      <wa-dropdown-item value="citizens">Citizens</wa-dropdown-item>
+      <wa-dropdown-item value="radar">Review a repo</wa-dropdown-item>
+      <wa-dropdown-item value="shortcuts">Keyboard shortcuts</wa-dropdown-item>
+      <wa-dropdown-item value="screenshot">Screenshot</wa-dropdown-item>
+      <wa-divider></wa-divider>
+      <wa-dropdown-item value="privacy">Privacy</wa-dropdown-item>
+      <wa-dropdown-item value="logout" id="top-menu-logout">Sign out</wa-dropdown-item>
+    </wa-dropdown>
+
     <div id="hud-bl">
-      <div id="hud-coords">X: 0 Y: 0</div>
-      <div id="hud-island">Deep Space</div>
+      <div id="hud-island">Open sky</div>
+      <div class="hud-readout">
+        <span id="hud-coords">0, 0</span>
+        <span id="hud-users">0 developers</span>
+        <span id="hud-repos">0 repos</span>
+      </div>
     </div>
-    <div id="hud-br">
-      <div id="hud-users">0 Developers</div>
-      <div id="hud-repos">0 Repositories</div>
+
+    <!-- Ship ring: Space or click the ship -->
+    <div id="ship-ring" role="toolbar" aria-label="Ship controls" hidden>
+      <wa-button class="ring-btn" id="ring-where" data-ring="where" aria-label="Where to">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      </wa-button>
+      <wa-button class="ring-btn" id="ring-map" data-ring="map" aria-label="Map">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6.5v13.5L9 17.5l6 2.5 6-2.5V4l-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/></svg>
+      </wa-button>
+      <wa-button class="ring-btn" id="ring-speed-btn" data-ring="speed" aria-label="Ship speed" aria-expanded="false" aria-controls="ring-speed">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 16a8 8 0 1 1 16 0"/><path d="m12 16 4-5"/></svg>
+      </wa-button>
+      <wa-button class="ring-btn" id="ring-home" data-ring="home" aria-label="My island">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg>
+      </wa-button>
+      <div class="ring-slot">
+      <wa-dropdown id="ring-more" placement="right-start" distance="8">
+        <wa-button slot="trigger" class="ring-btn" id="ring-more-btn" data-ring="more" aria-label="More">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>
+        </wa-button>
+        <h3 class="more-who"><img id="hud-avatar" src="" alt="" style="display:none"><span id="hud-name">Guest</span></h3>
+        <wa-dropdown-item value="citizens" id="btn-citizens">Citizens</wa-dropdown-item>
+        <wa-dropdown-item value="radar" id="btn-repo-radar">Review a repo</wa-dropdown-item>
+        <wa-dropdown-item value="shortcuts" id="btn-shortcuts">Keyboard shortcuts</wa-dropdown-item>
+        <wa-dropdown-item value="screenshot" id="btn-screenshot">Screenshot</wa-dropdown-item>
+        <wa-dropdown-item value="sync" id="btn-sync" style="display:none;">Refresh my island</wa-dropdown-item>
+        <wa-divider></wa-divider>
+        <wa-dropdown-item value="privacy">Privacy</wa-dropdown-item>
+        <wa-dropdown-item value="logout" id="btn-logout">Sign out</wa-dropdown-item>
+      </wa-dropdown>
+      </div>
+
+      <wa-tooltip for="ring-where">Where to</wa-tooltip>
+      <wa-tooltip for="ring-map">Map</wa-tooltip>
+      <wa-tooltip for="ring-speed-btn">Speed</wa-tooltip>
+      <wa-tooltip for="ring-home" id="ring-home-tip">My island</wa-tooltip>
+      <wa-tooltip for="ring-more-btn">More</wa-tooltip>
+
+      <div id="ring-speed" class="ring-pop" hidden>
+        <wa-slider id="speed-slider" label="Ship speed" hint="Hold Shift for a boost." min="0.5" max="3" step="0.25" value="1" with-label with-hint with-tooltip></wa-slider>
+      </div>
     </div>
-    <div id="controls-hint">WASD to move · Scroll to zoom · Click building to inspect · ? for shortcuts</div>
+
+    <!-- Always-visible way in to search; opens the "Where to?" prompt -->
+    <button id="search-trigger" type="button" aria-label="Search a GitHub username or repo">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span>Search a GitHub username or repo</span>
+      <kbd>/</kbd>
+    </button>
+
+    <!-- "Where to?" destination prompt, anchored above the ship -->
+    <div id="where-to" hidden>
+      <div class="where-field">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="search-input" type="text" role="combobox" aria-expanded="false" aria-controls="search-results"
+          aria-autocomplete="list" placeholder="Search a GitHub username or repo" autocomplete="off" aria-label="Where to? Type a developer or repo">
+      </div>
+      <div id="search-results" role="listbox" aria-label="Destinations"></div>
+      <div class="where-foot"><kbd>Enter</kbd> to fly, <kbd>Esc</kbd> to close</div>
+    </div>
+
+    <!-- Guests can look but not fly -->
+    <div id="guest-chip" hidden>
+      <span>You're exploring. Sign in to see everyone's islands and get your own.</span>
+      <wa-button size="s" variant="brand" href="/auth/github">Sign in</wa-button>
+    </div>
+
+    <!-- First sign-in coach: one speech bubble at a time, anchored in the world -->
+    <div id="coach" role="status" aria-live="polite" hidden>
+      <p id="coach-text"></p>
+      <button type="button" id="coach-skip">Skip</button>
+    </div>
   </div>
 
-  <!-- Repo tooltip -->
+  <!-- Repo hover tooltip (positioned by render.js) -->
   <div id="repo-tooltip" style="display:none">
     <div id="tt-name"></div>
     <div id="tt-lang"></div>
     <div id="tt-stars"></div>
-    <div id="tt-action">Click to inspect</div>
+    <div id="tt-action">Click to open</div>
   </div>
 
-  <!-- Territory Banner (Feature: Island Overlay) -->
-  <div id="territory-banner" class="hidden">
-    <div class="tb-subtitle">Entering Territory</div>
-    <div id="tb-name" class="tb-title">Deep Space</div>
-  </div>
-
-  <!-- Achievement Tracker Sidebar -->
-  <div id="achievements-sidebar" class="hidden">
-    <div class="sb-header">
-      <h2>🏆 Achievements</h2>
-      <button onclick="window.toggleAchievements()" class="rm-close">×</button>
-    </div>
-    <div class="sb-content">
-      <div id="achievements-list"></div>
-      <button class="btn-primary"
-        style="margin-top: 15px; width: 100%; border-color: var(--red); color: var(--red); background: transparent;"
-        onclick="window.showResetConfirm()">Reset Achievements</button>
-    </div>
-  </div>
-
-  <!-- Search -->
-  <div id="search-wrap">
-    <input id="search-input" type="text" placeholder="Search developer or repo..." autocomplete="off">
-    <div id="search-results"></div>
-  </div>
-
-  <!-- Login screen -->
+  <!-- Login -->
   <div id="login-screen">
-    <div class="login-inner">
-      <div class="login-logo">
-        <img src="logo.png?v=27" alt="GitSpace Logo" style="width: 100%; height: 100%; object-fit: contain;" />
+    <div class="login-panel">
+      <h1 class="login-title">GitSpace</h1>
+      <p class="login-lede">Turn your GitHub into a little island you can fly around.</p>
+      <div class="login-actions">
+        <wa-button variant="brand" size="l" href="/auth/github">Sign in with GitHub</wa-button>
+        <wa-button appearance="outlined" variant="neutral" size="l" id="btn-explore-guest">Explore without signing in</wa-button>
       </div>
-      <h1>GitSpace</h1>
-      <p class="login-tagline">Your GitHub repositories are a world.<br>Every repo is a building. Every developer is an
-        island.</p>
-      <div class="login-features">
-        <div class="login-feature"><span>🚀</span> Fly through the open-source galaxy</div>
-        <div class="login-feature"><span>🏗️</span> Your repos become isometric buildings</div>
-        <div class="login-feature"><span>🔍</span> Discover and explore other developers</div>
-      </div>
-      <a href="/auth/github" class="login-btn">Sign in with GitHub</a>
-      <div class="login-explore" id="btn-explore-guest">Explore as guest →</div>
+      <a href="/privacy.html" class="text-link">What we read from GitHub</a>
     </div>
   </div>
 
-  <!-- Repo Modal (Feature 6 - Rich) -->
-  <div id="repo-modal" class="hidden">
-    <div class="modal-inner repo-modal-inner">
-      <div id="rm-lang-accent" class="rm-lang-accent"></div>
-      <h2 id="rm-name">Repo Name</h2>
-      <p id="rm-description" class="rm-description">No description provided.</p>
-      <div class="rm-meta">
-        <span id="rm-lang">Language</span> |
-        <span id="rm-stars">⭐ 0</span>
-      </div>
-      <div class="rm-details">
-        <div class="rm-detail-item">
-          <span class="rm-detail-label">Size</span>
-          <span id="rm-size" class="rm-detail-value">0 KB</span>
-          <div class="rm-size-bar">
-            <div class="rm-size-fill" id="rm-size-fill"></div>
+  <!-- Repo card -->
+  <wa-dialog id="repo-modal" class="hidden" light-dismiss>
+    <div slot="label" class="rm-label"><span id="rm-name">Repo name</span><span id="rm-owner"></span></div>
+    <wa-tab-group id="rm-tabs">
+      <wa-tab slot="nav" panel="overview" id="btn-tab-overview">Overview</wa-tab>
+      <wa-tab slot="nav" panel="health" id="btn-tab-audit">Health check</wa-tab>
+      <wa-tab-panel name="overview" id="rm-panel-overview">
+        <p id="rm-description" class="rm-description">No description provided.</p>
+        <dl class="kv-list">
+          <div><dt>Stars</dt><dd id="rm-stars">0</dd></div>
+          <div><dt>Language</dt><dd id="rm-lang">Unknown</dd></div>
+          <div><dt>Size</dt><dd id="rm-size">0 KB</dd></div>
+          <div><dt>Updated</dt><dd id="rm-updated">Unknown</dd></div>
+        </dl>
+        <div class="modal-buttons">
+          <wa-button variant="brand" id="rm-btn-run-audit">Run health check</wa-button>
+          <wa-button appearance="outlined" variant="neutral" id="rm-btn">Open on GitHub</wa-button>
+        </div>
+      </wa-tab-panel>
+      <wa-tab-panel name="health" id="rm-panel-audit">
+        <div id="rm-audit-loading" class="radar-loading hidden" role="status">Checking the repo on GitHub...</div>
+        <div id="rm-audit-content"></div>
+      </wa-tab-panel>
+    </wa-tab-group>
+  </wa-dialog>
+
+  <!-- Review a repo -->
+  <wa-dialog id="radar-modal" class="hidden" label="Review a repo" light-dismiss>
+    <p class="muted dialog-lede">Paste a public repo to see its health score, what looks good, and what to fix next.</p>
+    <div class="radar-search-row">
+      <input type="text" class="field" id="radar-input" placeholder="owner/name or a GitHub link" autocomplete="off" aria-label="Repository" autofocus>
+      <wa-button variant="brand" id="btn-radar-audit">Check</wa-button>
+    </div>
+    <div id="radar-audit-loading" class="radar-loading hidden" role="status">Checking the repo on GitHub...</div>
+    <div id="radar-audit-result" class="radar-audit-result"></div>
+  </wa-dialog>
+
+  <!-- Island postcard -->
+  <wa-dialog id="profile-modal" class="hidden postcard-dialog" without-header light-dismiss label="Island postcard">
+    <div class="postcard">
+      <div class="pc-picture" id="pc-picture"></div>
+      <div class="pc-side">
+        <div class="pc-stamp" aria-hidden="true"><img id="pc-stamp-img" src="" alt=""></div>
+        <div class="pc-postmark" id="pc-postmark" aria-hidden="true"></div>
+        <div class="pm-ident">
+          <img id="pm-avatar" src="" alt="">
+          <div>
+            <h2 id="pm-name">Developer</h2>
+            <a id="pm-login" href="#" target="_blank" rel="noopener noreferrer"></a>
           </div>
         </div>
-        <div class="rm-detail-item">
-          <span class="rm-detail-label">Updated</span>
-          <span id="rm-updated" class="rm-detail-value">Unknown</span>
-        </div>
-      </div>
-      <div class="modal-buttons">
-        <button id="rm-btn" class="btn-primary">Open on GitHub</button>
-        <button id="btn-close-repo-modal" class="rm-close">Close</button>
+        <div id="pm-body"></div>
       </div>
     </div>
-  </div>
+    <wa-details summary="Read their README" id="pc-readme" appearance="plain">
+      <div id="pm-readme" class="pm-readme"></div>
+    </wa-details>
+    <div class="pc-actions">
+      <wa-button appearance="outlined" variant="neutral" id="pm-btn-download">Download postcard</wa-button>
+      <wa-button appearance="outlined" variant="neutral" id="pm-btn-share">Copy island link</wa-button>
+      <wa-button appearance="outlined" variant="neutral" id="pm-btn-github">Open on GitHub</wa-button>
+      <wa-button variant="brand" id="pm-btn-travel">Fly there</wa-button>
+    </div>
+    <wa-button class="pc-close" appearance="plain" variant="neutral" id="btn-close-profile-modal" aria-label="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </wa-button>
+  </wa-dialog>
 
-  <!-- Profile Modal (Feature 7 - Rich Dashboard) -->
-  <div id="profile-modal" class="hidden">
-    <div class="modal-inner profile-modal-inner">
-      <img id="pm-avatar" src="" alt="">
-      <h2 id="pm-name">Developer</h2>
-      <div id="pm-badges" class="pm-badges" style="display:none"></div>
-      <div class="pm-meta">
-        <span id="pm-repos">0 Repos</span> |
-        <span id="pm-stars">⭐ 0</span>
-      </div>
-      <div class="pm-dashboard">
-        <div class="pm-chart-section">
-          <canvas id="pm-pie-chart" width="120" height="120"></canvas>
-          <div id="pm-pie-legend" class="pm-pie-legend"></div>
-        </div>
-        <div class="pm-top-repos-section">
-          <h3>Top Repositories</h3>
-          <div id="pm-top-repos" class="pm-top-repos"></div>
-        </div>
-      </div>
-      <div class="modal-buttons">
-        <button id="pm-btn-github" class="btn-secondary">GitHub Profile</button>
-        <button id="pm-btn-travel" class="btn-primary">Travel to Island</button>
-        <button id="pm-btn-share" class="btn-secondary">Share Link</button>
-        <button id="btn-close-profile-modal" class="rm-close">Close</button>
-      </div>
-    </div>
-  </div>
+  <!-- Guests can open one person; after that, this asks them to sign in -->
+  <wa-dialog id="guest-gate" class="hidden" label="Sign in to see more" light-dismiss>
+    <p>Sign in with GitHub to look at more islands. You will also get your own.</p>
+    <wa-button slot="footer" variant="brand" href="/auth/github">Sign in with GitHub</wa-button>
+  </wa-dialog>
 
-  <!-- Citizens Sidebar -->
-  <div id="citizens-sidebar" class="hidden">
-    <div class="sidebar-header">
-      <h2>Citizens</h2>
-      <button id="btn-close-citizens" class="rm-close">×</button>
-    </div>
-    <div class="citizens-search-wrap">
-      <input type="text" id="citizens-search" placeholder="Search citizens...">
-    </div>
+  <!-- Citizens -->
+  <wa-drawer id="citizens-sidebar" class="hidden" label="Citizens" placement="end" light-dismiss>
+    <input type="text" class="field" id="citizens-search" placeholder="Filter by username" aria-label="Filter by username">
     <div id="citizens-list"></div>
-  </div>
+  </wa-drawer>
 
-  <!-- Shortcuts Overlay (Feature 10) -->
-  <div id="shortcuts-overlay" class="hidden">
-    <div class="shortcuts-inner">
-      <h3>⌨️ Keyboard Shortcuts</h3>
-      <div class="shortcuts-grid">
-        <div class="shortcut-row"><kbd>W A S D</kbd><span>Move ship</span></div>
-        <div class="shortcut-row"><kbd>↑ ← ↓ →</kbd><span>Move ship</span></div>
-        <div class="shortcut-row"><kbd>Scroll</kbd><span>Zoom in/out</span></div>
-        <div class="shortcut-row"><kbd>Click</kbd><span>Inspect building/island</span></div>
-        <div class="shortcut-row"><kbd>P</kbd><span>Screenshot</span></div>
-        <div class="shortcut-row"><kbd>F</kbd><span>Toggle FPS counter</span></div>
-        <div class="shortcut-row"><kbd>H / ?</kbd><span>Toggle this overlay</span></div>
-        <div class="shortcut-row"><kbd>Esc</kbd><span>Close modals</span></div>
-      </div>
-      <button id="btn-restart-tour" class="btn-primary"
-        onclick="console.log('Button clicked!'); if(window.hideShortcutsOverlay) window.hideShortcutsOverlay(); if(window.startTour) window.startTour();"
-        style="margin-top: 15px; width: 100%; padding: 8px; font-size: 13px;">Restart Tutorial</button>
-      <p class="shortcuts-dismiss">Press any key to dismiss</p>
-    </div>
-  </div>
-
-  <!-- Custom Confirm Modal -->
-  <div id="confirm-modal" class="modal hidden">
-    <div class="confirm-inner">
-      <h2>Reset Achievements?</h2>
-      <p>Are you absolutely sure you want to wipe all your unlocked achievements? This action cannot be undone.</p>
-      <div class="confirm-buttons">
-        <button id="btn-confirm-cancel">Cancel</button>
-        <button id="btn-confirm-reset" class="rm-close">Yes, Wipe Data</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast Notification -->
-  <div id="toast-notification" class="toast hidden"
-    style="position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: var(--bg-panel); color: white; padding: 15px 25px; border-radius: 8px; border: 1px solid var(--cyan); box-shadow: 0 5px 20px rgba(0,0,0,0.5); z-index: 9999; text-align: center; font-family: var(--font-sans); transition: all 0.3s ease;">
-  </div>
+  <!-- Shortcuts -->
+  <wa-dialog id="shortcuts-overlay" class="hidden" label="Keyboard shortcuts" light-dismiss>
+    <dl class="kv-list shortcuts-list">
+      <div><dt>Arrow keys or WASD</dt><dd>Fly</dd></div>
+      <div><dt><kbd>Space</kbd> or click the ship</dt><dd>Ship controls</dd></div>
+      <div><dt><kbd>/</kbd> or start typing a name</dt><dd>Where to</dd></div>
+      <div><dt><kbd>Shift</kbd></dt><dd>Boost while flying</dd></div>
+      <div><dt>Scroll</dt><dd>Zoom</dd></div>
+      <div><dt>Click a building</dt><dd>Open the repo</dd></div>
+      <div><dt>Click an island</dt><dd>Open the postcard</dd></div>
+      <div><dt><kbd>M</kbd></dt><dd>Open the map</dd></div>
+      <div><dt><kbd>R</kbd></dt><dd>Review a repo</dd></div>
+      <div><dt><kbd>P</kbd></dt><dd>Screenshot</dd></div>
+      <div><dt><kbd>F</kbd></dt><dd>Frame rate counter</dd></div>
+      <div><dt><kbd>H</kbd> or <kbd>?</kbd></dt><dd>Show or hide this list</dd></div>
+      <div><dt><kbd>Esc</kbd></dt><dd>Close panels</dd></div>
+    </dl>
+  </wa-dialog>
 
   <!-- Scripts -->
-  <script src="js/engine.js?v=30"></script>
-  <script src="js/input.js?v=30"></script>
-  <script src="js/render.js?v=30"></script>
-  <script src="js/network.js?v=30"></script>
-  <script src="js/ui.js?v=30"></script>
-  <script src="js/tour.js?v=30"></script>
-  <script src="js/init.js?v=30"></script>
+  <script src="js/engine.js?v=49"></script>
+  <script src="js/input.js?v=38"></script>
+  <script src="js/render.js?v=40"></script>
+  <script src="js/network.js?v=32"></script>
+  <script src="js/radar.js?v=60"></script>
+  <script src="js/ui.js?v=64"></script>
+  <script src="js/init.js?v=32"></script>
+  <script src="js/landing.js?v=1"></script>
 </body>
 
 </html>

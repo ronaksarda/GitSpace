@@ -34,7 +34,12 @@ module.exports = function(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL) {
             }
             console.log('[Auth] Mocking GitHub login (no CLIENT_ID set).');
             const newSid = crypto.randomBytes(32).toString('hex');
-            await db.createSession(newSid, null, 'mock_token');
+            try {
+                await db.createSession(newSid, null, 'mock_token');
+            } catch (err) {
+                console.error('[Auth] Failed to create mock session:', err.message);
+                return res.status(500).send('Authentication setup failed');
+            }
             setSessionCookie(res, newSid);
             return res.redirect('/');
         }
@@ -55,19 +60,19 @@ module.exports = function(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL) {
     // Step 2: Handle GitHub callback
     router.get('/auth/callback', async (req, res) => {
         const { code, state } = req.query;
-        let session = await getSession(req);
 
-        if (!state || !/^[0-9a-f]{32}$/.test(state)) {
+        if (typeof state !== 'string' || !/^[0-9a-f]{32}$/.test(state)) {
             console.error('[Auth] Invalid state parameter format:', state);
             return res.status(400).send('Invalid state parameter format');
         }
 
-        if (!session || session.state !== state) {
-            console.error('[Auth] Invalid state. Session exists:', !!session, 'Session state:', session ? session.state : 'N/A', 'Query state:', state);
-            return res.status(403).send('Invalid state parameter. Possible CSRF attack. Please go back and try signing in again.');
-        }
-
         try {
+            const session = await getSession(req);
+            if (!session || session.state !== state) {
+                console.error('[Auth] Invalid state. Session exists:', !!session, 'Session state:', session ? session.state : 'N/A', 'Query state:', state);
+                return res.status(403).send('Invalid state parameter. Possible CSRF attack. Please go back and try signing in again.');
+            }
+
             console.log('[Auth] Exchanging code for token...');
             const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
                 method: 'POST',
@@ -91,13 +96,14 @@ module.exports = function(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL) {
 
             console.log('[Auth] Token obtained successfully');
 
-            const currentSid = getSessionId(req) || session.sid;
-            await db.updateSessionToken(currentSid, tokenData.access_token);
-            await db.updateSessionState(currentSid, null);
-            setSessionCookie(res, currentSid);
+            // Rotate session id on login so a pre-login sid can't be fixated
+            const newSid = crypto.randomBytes(32).toString('hex');
+            await db.createSession(newSid, null, tokenData.access_token);
+            await db.deleteSession(session.sid);
+            setSessionCookie(res, newSid);
             res.redirect('/');
         } catch (err) {
-            console.error('[Auth] Token exchange exception');
+            console.error('[Auth] Callback error:', err.message);
             res.status(500).send('Authentication failed');
         }
     });

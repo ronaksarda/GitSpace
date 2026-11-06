@@ -1,5 +1,7 @@
 const CHUNK_SIZE = 4000;
 let isOffline = false;
+let offlineRetryAt = 0;
+let offlineBackoff = 2000;
 
 function setOfflineStatus(offline) {
   if (isOffline === offline) return;
@@ -28,10 +30,13 @@ async function fetchWithRetry(url, maxRetries = 3) {
         delay *= 2;
         continue;
       }
+      offlineBackoff = 2000;
       setOfflineStatus(false);
       return res;
     } catch (err) {
       if (attempt === maxRetries) {
+        offlineRetryAt = Date.now() + offlineBackoff;
+        offlineBackoff = Math.min(offlineBackoff * 2, 60000);
         setOfflineStatus(true);
         throw err;
       }
@@ -42,7 +47,8 @@ async function fetchWithRetry(url, maxRetries = 3) {
 }
 
 async function checkChunks() {
-  if (isOffline) return;
+  // While offline, probe again after an exponential backoff instead of waiting for an 'online' event
+  if (isOffline && (!navigator.onLine || Date.now() < offlineRetryAt)) return;
 
   const cx = Math.floor(player.x / CHUNK_SIZE);
   const cy = Math.floor(player.y / CHUNK_SIZE);
@@ -66,7 +72,7 @@ async function checkChunks() {
               if (Math.abs(currentCx - x) <= chunksX + 1 && Math.abs(currentCy - y) <= chunksY + 1) {
                 for (const [login, user] of Object.entries(data.users)) {
                   if (!islands.find(i => i.login === login)) {
-                    islands.push(buildIsland(login, user));
+                    islands.push(buildIsland(login, { ...user, repos: user.repos || user.buildings || [] }));
                   }
                 }
               } else {

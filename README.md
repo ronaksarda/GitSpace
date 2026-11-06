@@ -65,7 +65,9 @@ make
 cd ../..
 
 # Or manually compile it (Windows/Linux/macOS)
-g++ -O3 -std=c++17 -pthread -o src/engine/gitland_engine src/engine/main.cpp
+g++ -O2 -std=c++17 -o src/engine/gitspace_engine src/engine/main.cpp   # add .exe on Windows
+
+# Or: npm run build (same command, falls back to the JS engine if g++ is missing)
 ```
 
 ### 4. Environment Setup
@@ -109,9 +111,8 @@ For the curious engineers, here is exactly how we generate a galaxy from code.
 
 The core of GitSpace's backend performance relies on an iterative outward spiral algorithm to organically pack repositories together without overlapping. By default, this runs as a deterministic JavaScript algorithm. However, for extreme performance on large deployments, it can be accelerated using an optional custom C++17 engine.
 
-- **Contiguous Memory Arena**: The engine uses a custom `MemoryArena` allocator to prevent heap fragmentation, storing thousands of node objects sequentially in memory for extreme performance.
-- **Dynamic Quadtree Partitioning**: A `Quadtree` implementation bounds the infinite coordinate space to make searching for neighbors lightning fast.
-- **Golden Ratio Collision Resolution**: When calculating where to place a building on a user's island, the engine uses an iterative outward spiral algorithm. It steps using the Golden Angle (~2.39996 radians) to organically "pack" repositories together without overlapping, resulting in natural-looking circular cities.
+- **Dynamic Quadtree Partitioning**: A `Quadtree` covering the area around the island centre makes searching for neighbors fast.
+- **Spiral Collision Resolution**: When calculating where to place a building on a user's island, the engine walks an outward spiral: each attempt turns a fixed 0.38197 radians and moves out to `0.8 * radius * sqrt(attempt)`, until the building no longer overlaps its neighbours (radius sum + 5 units gap). This packs repositories into natural-looking circular cities. The JavaScript fallback in `api.js` runs the exact same algorithm, so both give identical layouts.
 - **Landmass Footprint Calculation**: Repositories are categorized dynamically based on their language. For example, `C++` and `Rust` are treated as `FrameworkNode` types, giving them a larger fundamental base radius footprint. The footprint scales non-linearly with the repository's stars (`sqrt(stars)`) and size (`sqrt(size)`).
 
 ### 2. The Node.js Express Backend (`src/backend/`)

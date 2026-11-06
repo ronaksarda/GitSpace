@@ -1,5 +1,6 @@
-const canvas = document.getElementById('world');
-const ctx = canvas.getContext('2d', { alpha: false });
+// let, not const: render.js swaps these briefly to draw island snapshots offscreen.
+let canvas = document.getElementById('world');
+let ctx = canvas.getContext('2d', { alpha: false });
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
@@ -8,15 +9,11 @@ const isMobile = () => window.innerWidth < 768;
 let nearestIsland = null;
 let nearestDist = Infinity;
 
-function isValidPosition(x, y) {
-  return true;
-}
-
 let worldData = { totalUsers: 0, totalRepos: 0 };
 let currentUser = null;
 let islands = [];
 let loadedChunks = new Set();
-let player = { x: 50000, y: 50000, speed: 12 };
+let player = { x: 50000, y: 50000, speed: 12, vx: 0, vy: 0 };
 let camera = { x: 50000, y: 50000, zoom: 0.5 };
 let targetCamera = { x: 50000, y: 50000, zoom: 0.5 };
 let keys = {};
@@ -63,33 +60,11 @@ function genStars(count = 900) {
 }
 genStars();
 
-function calculateBadges(repos) {
-  const badges = [];
-  const totalStars = repos.reduce((sum, r) => sum + (r.stars || 0), 0);
-  const languages = new Set(repos.map(r => r.language).filter(Boolean));
-  const forkCount = repos.filter(r => r.isFork).length;
-  const maxStars = Math.max(0, ...repos.map(r => r.stars || 0));
-
-  if (totalStars >= 100) {
-    badges.push({ icon: '🌟', label: 'Star Collector', bgColor: 'rgba(251,191,36,0.3)', borderColor: '#fbbf24' });
-  }
-  if (repos.length >= 30) {
-    badges.push({ icon: '🏗️', label: 'Prolific Builder', bgColor: 'rgba(59,130,246,0.3)', borderColor: '#3b82f6' });
-  }
-  if (languages.size >= 5) {
-    badges.push({ icon: '🌐', label: 'Polyglot', bgColor: 'rgba(168,85,247,0.3)', borderColor: '#a855f7' });
-  }
-  if (maxStars >= 500) {
-    badges.push({ icon: '🔥', label: 'Trending', bgColor: 'rgba(239,68,68,0.3)', borderColor: '#ef4444' });
-  }
-  if (forkCount >= 5) {
-    badges.push({ icon: '🍴', label: 'Contributor', bgColor: 'rgba(34,197,94,0.3)', borderColor: '#22c55e' });
-  }
-  return badges;
-}
-
 function buildIsland(login, userData) {
-  const { cx, cy, avatar, primaryLanguage, repos, isActive } = userData;
+  const { cx, cy, avatar, primaryLanguage, isActive } = userData;
+  // Islands show at most 60 buildings: the most-starred ones (matches the server cap on sync).
+  const allRepos = userData.repos || [];
+  const repos = allRepos.length > 60 ? [...allRepos].sort((a, b) => (b.stars || 0) - (a.stars || 0)).slice(0, 60) : allRepos;
   const color = langColor(primaryLanguage);
   const repoCount = repos.length;
   const baseRadius = Math.max(120, 80 + repoCount * 18);
@@ -121,35 +96,19 @@ function buildIsland(login, userData) {
   // Pre-sort buildings by Y coordinate for correct rendering depth
   buildings.sort((a, b) => a.y - b.y);
 
-  // Clamp island spread — sqrt compression brings outliers in without crushing center
-  const MAX_SPREAD = 800;
-  if (maxDist > MAX_SPREAD) {
-    for (const b of buildings) {
-      const dx = b.x - cx;
-      const dy = b.y - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 0) {
-        const compressed = MAX_SPREAD * Math.sqrt(dist / maxDist);
-        b.x = cx + dx * (compressed / dist);
-        b.y = cy + dy * (compressed / dist);
-      }
-    }
-    maxDist = MAX_SPREAD;
-  }
-
-  const islandRadius = Math.max(120, maxDist + 60);
+  // No spread squeeze: squeezing pushed buildings into each other on 200+ repo accounts. The island grows instead.
+  // Edge sits past the outermost building plus its widest footprint, so nothing hangs off the coast.
+  const islandRadius = Math.max(120, maxDist + 90);
 
   const img = new Image();
   img.crossOrigin = 'anonymous';
-  img.src = avatar || `https://github.com/identicons/${login}.png`;
-
-  const badges = calculateBadges(repos);
+  img.src = avatar || `https://avatars.githubusercontent.com/${encodeURIComponent(login)}?s=80`;
 
   return {
     login, cx, cy, color, islandRadius,
     avatar, primaryLanguage, isActive,
     repoCount: repos.length, buildings, seed: rng(0),
-    avatarImg: img, badges,
+    avatarImg: img,
     totalStars: repos.reduce((s, r) => s + (r.stars || 0), 0)
   };
 }
@@ -219,23 +178,8 @@ window.initDistance = function (username) {
 };
 window.initDistance('guest');
 
-function showToast(message, duration = 2500) {
-  const toast = document.getElementById('toast-notification');
-  if (!toast) return;
-  toast.textContent = message;
-  toast.classList.remove('hidden');
-  toast.classList.add('visible');
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => {
-    toast.classList.remove('visible');
-    toast.classList.add('hidden');
-  }, duration);
-}
-
 function gameLoop() {
   window.drawnLabels = [];
-  ctx.fillStyle = '#030308';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   let moving = false;
   let moveDx = 0, moveDy = 0;
@@ -252,44 +196,30 @@ function gameLoop() {
     autopilotTarget = null;
   }
 
-  if (moving) {
-    const len = Math.sqrt(moveDx * moveDx + moveDy * moveDy);
-    const dynamicSpeed = player.speed / Math.sqrt(camera.zoom) + camera.zoom;
-
-    const stepSize = 5;
-    const steps = Math.ceil(dynamicSpeed / stepSize);
-    const stepX = (moveDx / len) * (dynamicSpeed / steps);
-    const stepY = (moveDy / len) * (dynamicSpeed / steps);
-
-    for (let i = 0; i < steps; i++) {
-      let nx = player.x + stepX;
-      let ny = player.y + stepY;
-      nx = Math.max(-1000000, Math.min(1000000, nx));
-      ny = Math.max(-1000000, Math.min(1000000, ny));
-      if (isValidPosition(nx, player.y)) player.x = nx;
-      if (isValidPosition(player.x, ny)) player.y = ny;
-    }
-
-    const targetAngle = Math.atan2(moveDy, moveDx);
-    let diff = targetAngle - playerAngle;
+  // Ship has inertia: it eases up to speed and coasts to a stop.
+  // shortcut: per-frame easing, not dt-scaled; feels slower on 30fps devices, upgrade if that matters.
+  const boost = keys['shift'] ? 2.5 : 1; // hold Shift to go faster
+  const topSpeed = (player.speed * (window.speedMultiplier || 1) * boost) / Math.sqrt(camera.zoom) + camera.zoom;
+  const len = Math.hypot(moveDx, moveDy) || 1;
+  const accel = moving ? 0.12 : 0.07;
+  player.vx += ((moving ? (moveDx / len) * topSpeed : 0) - player.vx) * accel;
+  player.vy += ((moving ? (moveDy / len) * topSpeed : 0) - player.vy) * accel;
+  const coastSpeed = Math.hypot(player.vx, player.vy);
+  if (!autopilotTarget && coastSpeed > 0.05) {
+    player.x = Math.max(-1000000, Math.min(1000000, player.x + player.vx));
+    player.y = Math.max(-1000000, Math.min(1000000, player.y + player.vy));
+    let diff = Math.atan2(player.vy, player.vx) - playerAngle;
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
     playerAngle += diff * 0.15;
-
-    trails.push({
-      x: player.x - Math.cos(playerAngle) * 12,
-      y: player.y - Math.sin(playerAngle) * 12,
-      vx: (Math.random() - 0.5) * 1.5 - Math.cos(playerAngle) * 2,
-      vy: (Math.random() - 0.5) * 1.5 - Math.sin(playerAngle) * 2,
-      life: 1.0
-    });
-
-    totalDistanceTravelled += dynamicSpeed;
-    if (Math.random() < 0.05) localStorage.setItem(distanceKey, totalDistanceTravelled.toString());
-    if (totalDistanceTravelled >= 100000 && window.unlockAchievement) {
-      window.unlockAchievement('marathon');
+    if (coastSpeed > 1.5 && animFrame % 2 === 0) {
+      trails.push({ x: player.x - Math.cos(playerAngle) * 14, y: player.y - Math.sin(playerAngle) * 14,
+        vx: (Math.random() - 0.5) * 1.2 - Math.cos(playerAngle) * 1.5, vy: (Math.random() - 0.5) * 1.2 - Math.sin(playerAngle) * 1.5, life: 1.0 });
     }
+    totalDistanceTravelled += coastSpeed;
+    if (Math.random() < 0.05) localStorage.setItem(distanceKey, totalDistanceTravelled.toString());
   }
+  window.shipSpeed = autopilotTarget ? 10 : coastSpeed;
 
   // Autopilot navigation
   if (autopilotTarget) {
@@ -297,20 +227,24 @@ function gameLoop() {
     const dy = autopilotTarget.y - player.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
+    if (autopilotTarget.startDist === undefined) autopilotTarget.startDist = dist;
     const stoppingDistance = autopilotTarget.item ? (autopilotTarget.item.type === 'repo' ? 80 : 150) : 5;
 
-    if (dist > 5000 && !warpActive) {
+    if (dist > 5000 && !warpActive && !window.attractMode) {
       warpActive = true;
       warpProgress = 0;
     }
 
-    const speedMultiplier = warpActive ? 10 : 1;
+    const speedMultiplier = window.attractMode ? 0.3 : (warpActive ? 10 : 1);
     const dynamicSpeed = Math.min(dist * 0.05, (30 / camera.zoom) * speedMultiplier);
 
     if (dist <= stoppingDistance || dist < dynamicSpeed) {
       if (warpActive) {
         warpActive = false;
-        showToast('⚡ Warp complete');
+      }
+      if (autopilotTarget.startDist > 1200 && window.startArrival && !window.attractMode) {
+        const near = islands.find(i => Math.hypot(i.cx - player.x, i.cy - player.y) < i.islandRadius * 1.6);
+        if (near) window.startArrival(near);
       }
       if (autopilotTarget.item) openModalForItem(autopilotTarget.item);
       
@@ -338,15 +272,12 @@ function gameLoop() {
         let ny = player.y + stepYa;
         nx = Math.max(-1000000, Math.min(1000000, nx));
         ny = Math.max(-1000000, Math.min(1000000, ny));
-        if (isValidPosition(nx, player.y)) player.x = nx;
-        if (isValidPosition(player.x, ny)) player.y = ny;
+        player.x = nx;
+        player.y = ny;
       }
       
       totalDistanceTravelled += dynamicSpeed;
       if (Math.random() < 0.05) localStorage.setItem(distanceKey, totalDistanceTravelled.toString());
-      if (totalDistanceTravelled >= 100000 && window.unlockAchievement) {
-        window.unlockAchievement('marathon');
-      }
 
       trails.push({
         x: player.x - Math.cos(playerAngle) * 12,
@@ -368,16 +299,15 @@ function gameLoop() {
   targetCamera.y = player.y;
   camera.x += (targetCamera.x - camera.x) * 0.08;
   camera.y += (targetCamera.y - camera.y) * 0.08;
+  camera.zoom += (targetCamera.zoom - camera.zoom) * 0.15;
 
   // Draw world
   drawNebula();
   drawStars();
   drawSlipstream2D();
-  updateShootingStars();
   for (const island of islands) drawIsland(island);
-  drawPlayer();
-  drawMinimap();
-  drawCompass();
+  if (!window.attractMode) { drawPlayer(); drawMinimap(); drawCompass(); }
+  drawArrival();
   drawFPS();
 
   // Draw virtual joystick
@@ -412,3 +342,43 @@ function gameLoop() {
   animFrame++;
   requestAnimationFrame(gameLoop);
 }
+
+// Attract mode: signed-out visitors watch a slow flyover between real islands and cannot steer or click.
+window.attractMode = false;
+let attractTimer = null;
+function attractHop() {
+  if (!window.attractMode) return;
+  const pool = islands.filter(i => Math.hypot(i.cx - player.x, i.cy - player.y) > 400);
+  const next = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+  autopilotTarget = next ? { x: next.cx, y: next.cy + next.islandRadius * 0.3 } : { x: player.x + 1500, y: player.y + 600 };
+  attractTimer = setTimeout(attractHop, 9000);
+}
+window.startAttractMode = function () {
+  if (window.attractMode) return;
+  window.attractMode = true;
+  targetCamera.zoom = 0.45;
+  clearTimeout(attractTimer);
+  attractTimer = setTimeout(attractHop, 800);
+};
+window.stopAttractMode = function () {
+  window.attractMode = false;
+  clearTimeout(attractTimer);
+  autopilotTarget = null;
+  player.vx = player.vy = 0;
+};
+// Swallow input on the world while signed out (capture phase runs before input.js handlers).
+['mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'touchmove', 'touchend', 'dblclick', 'contextmenu'].forEach(type =>
+  canvas.addEventListener(type, e => { if (window.attractMode) { e.stopImmediatePropagation(); if (e.cancelable) e.preventDefault(); } }, { capture: true, passive: false }));
+window.addEventListener('keydown', e => {
+  if (window.attractMode && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) && !e.target.isContentEditable) e.stopImmediatePropagation();
+}, { capture: true });
+
+// Explore mode for signed-out visitors: fly freely; the UI limits them to opening one person's details.
+window.guestExplore = false;
+window.startGuestExplore = function () {
+  window.attractMode = false;
+  clearTimeout(attractTimer);
+  autopilotTarget = null;
+  window.guestExplore = true;
+};
+window.stopGuestExplore = function () { window.guestExplore = false; };

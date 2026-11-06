@@ -7,9 +7,10 @@
   },
   "scripts": {
     "start": "node src/backend/server.js",
-    "build": "echo \"Build complete. Serving frontend via static and running Node.js.\"",
+    "build": "g++ -O2 -std=c++17 -o src/engine/gitspace_engine src/engine/main.cpp || echo \"engine build skipped, JS fallback\"",
     "seed:stress": "node src/backend/scripts/seed_stress.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compact": "node src/backend/scripts/compact_islands.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "compression": "^1.8.1",

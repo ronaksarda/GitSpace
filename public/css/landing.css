@@ -1,0 +1,103 @@
+/* Front page scroll story. Sits over the live world canvas; only the small cards are opaque. */
+.gsl {
+  --gsl-cream: #FFF4E6;
+  --gsl-ink: #2B2340;
+  --gsl-ink-soft: #6B5E80;
+  --gsl-coral: #F2765A;
+  --gsl-grass: #9BD38A;
+  --gsl-toy: 0 5px 0 rgba(43, 35, 64, .28);
+  position: fixed; inset: 0; z-index: 900;
+  overflow-y: auto; overflow-x: hidden;
+  scroll-snap-type: y proximity;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  outline: none;
+  font: 400 17px/1.5 'Rubik', system-ui, sans-serif;
+  color: var(--gsl-ink);
+}
+.gsl[hidden] { display: none; }
+
+.gsl-step {
+  position: relative;
+  min-height: 100vh; min-height: 100svh;
+  display: flex; align-items: flex-end;
+  padding: 16px 16px max(20px, env(safe-area-inset-bottom));
+  scroll-snap-align: start;
+}
+
+.gsl-card {
+  width: 100%; max-width: 440px;
+  background: var(--gsl-cream);
+  border-radius: 14px;
+  box-shadow: var(--gsl-toy);
+  padding: 18px 18px 18px;
+}
+.gsl-h { font: 600 clamp(28px, 8.4vw, 44px)/1.08 'Fredoka', system-ui, sans-serif; margin: 0 0 8px; }
+.gsl-card-big .gsl-h { font-size: clamp(36px, 10vw, 64px); }
+.gsl-p { margin: 0; color: var(--gsl-ink-soft); }
+.gsl-soon {
+  display: inline-block; margin: 12px 0 0; padding: 2px 9px;
+  font-size: 13px; color: var(--gsl-ink); background: #EFE2D1; border-radius: 6px;
+}
+.gsl-cue { margin: 14px 0 0; font-size: 14px; color: var(--gsl-ink-soft); }
+.gsl-cue::after { content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 8px; border: solid currentColor; border-width: 0 2px 2px 0; transform: translateY(-3px) rotate(45deg); }
+
+.gsl-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.gsl-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 46px; padding: 10px 18px; flex: 1 1 auto;
+  font: 500 16px/1 'Rubik', system-ui, sans-serif;
+  border: 0; border-radius: 12px; cursor: pointer; text-decoration: none;
+  box-shadow: var(--gsl-toy);
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.gsl-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 rgba(43, 35, 64, .28); }
+.gsl-btn-primary { background: var(--gsl-coral); color: #fff; }
+.gsl-btn-quiet { background: #fff; color: var(--gsl-ink); box-shadow: var(--gsl-toy), inset 0 0 0 2px #E6D6C2; }
+.gsl-actions-big .gsl-btn { min-height: 52px; font-size: 17px; }
+.gsl :focus-visible { outline: 3px solid var(--gsl-ink); outline-offset: 3px; }
+
+/* postcard: a real snapshot of the island the camera is looking at */
+.gsl-step-postcard { flex-direction: column; justify-content: flex-end; align-items: stretch; gap: 18px; }
+.gsl-postcard {
+  margin: 0 auto; width: min(320px, 86vw);
+  background: var(--gsl-cream); border-radius: 10px; padding: 10px 10px 12px;
+  box-shadow: var(--gsl-toy), 0 0 0 2px var(--gsl-ink);
+  transform: rotate(-3deg);
+}
+.gsl-postcard[hidden] { display: none; }
+.gsl-pc-pic { aspect-ratio: 300 / 188; border-radius: 6px; overflow: hidden; background: #35295A; }
+.gsl-pc-pic canvas { display: block; width: 100% !important; height: 100% !important; }
+.gsl-pc-cap { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-top: 8px; }
+.gsl-pc-name { font: 600 18px/1.2 'Fredoka', system-ui, sans-serif; overflow-wrap: anywhere; }
+.gsl-pc-line { font-size: 13px; color: var(--gsl-ink-soft); white-space: nowrap; }
+
+/* where you are in the story */
+.gsl-track {
+  position: fixed; right: 10px; top: 20vh; bottom: 20vh; width: 3px;
+  background: rgba(255, 244, 230, .25); border-radius: 2px; pointer-events: none;
+}
+.gsl-fill {
+  display: block; width: 100%; height: 100%;
+  background: var(--gsl-cream); border-radius: 2px;
+  transform-origin: top; transform: scaleY(0);
+  transition: transform .4s ease;
+}
+
+/* the one entrance moment: the first card drops in */
+.gsl-drop { animation: gsl-drop .7s cubic-bezier(.3, 1.45, .55, 1) both .2s; }
+@keyframes gsl-drop { from { opacity: 0; translate: 0 -30px; } to { opacity: 1; translate: 0 0; } }
+
+@media (min-width: 760px) {
+  .gsl-step { align-items: center; padding: 40px 6vw; }
+  .gsl-card { padding: 24px 26px 24px; }
+  .gsl-step-postcard { flex-direction: row; justify-content: flex-start; align-items: center; gap: 0; }
+  .gsl-step-postcard .gsl-card { order: 1; }
+  .gsl-postcard { order: 2; margin: 0 0 0 auto; width: 340px; }
+  .gsl-track { right: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gsl-drop { animation: none; }
+  .gsl-fill, .gsl-btn { transition: none; }
+}

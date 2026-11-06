@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy, GitSpace</title>
+  <meta name="theme-color" content="#1E1B3A">
+  <link rel="icon" type="image/png" href="logo.png?v=28">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Rubik:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --ink: #2B2340; --ink-soft: #6B5E80; --cream: #FFF4E6; --cream-2: #F6E8D6; --coral: #F2765A; --sky: #1E1B3A; }
+    body { margin: 0; background: var(--sky); color: var(--ink); font: 400 16px/1.6 'Rubik', system-ui, sans-serif; }
+    main { max-width: 640px; margin: 40px auto; padding: 28px 28px 32px; background: var(--cream); border-radius: 14px; box-shadow: 0 5px 0 rgba(43, 35, 64, .28); }
+    h1, h2 { font-family: 'Fredoka', 'Rubik', sans-serif; font-weight: 600; line-height: 1.2; }
+    h1 { font-size: 30px; margin: 12px 0 6px; }
+    h2 { font-size: 19px; margin: 28px 0 6px; }
+    p, li { margin: 0 0 10px; }
+    ul, ol { padding-left: 22px; }
+    a { color: var(--ink); text-underline-offset: 3px; }
+    a:hover { color: var(--ink-soft); }
+    a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+    .back { display: inline-block; padding: 8px 14px; border-radius: 10px; background: var(--cream-2); text-decoration: none; font-weight: 500; box-shadow: 0 3px 0 rgba(43, 35, 64, .28); }
+    .back:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(43, 35, 64, .28); }
+    .muted { color: var(--ink-soft); }
+    @media (max-width: 680px) { main { margin: 0; border-radius: 0; min-height: 100vh; padding: 20px 16px 32px; box-shadow: none; } }
+  </style>
+</head>
+
+<body>
+  <main>
+    <a class="back" href="/">Back to GitSpace</a>
+    <h1>What GitSpace reads from GitHub</h1>
+    <p class="muted">GitSpace is a student project. Here is, in plain words, what happens with your data.</p>
+
+    <h2>When you sign in with GitHub</h2>
+    <p>We ask GitHub for no extra permissions, so we only get what is already public on your profile:
+      your username, avatar, name, bio, location and your public repositories with their stats
+      (stars, language, size, description, last update).</p>
+    <p>We cannot see your private repositories, and we never post, change or delete anything on your GitHub.</p>
+
+    <h2>What we keep</h2>
+    <ul>
+      <li>Your username, avatar, main language, and when you first and last signed in.</li>
+      <li>For each public repo: its name, description, language, size, stars, whether it is a fork, its link and when it was last updated.</li>
+      <li>A login session cookie, so you stay signed in (it expires after 24 hours).</li>
+      <li>Your GitHub access token, stored encrypted, so we can refresh your island. It is deleted when you sign out or when the session expires.</li>
+    </ul>
+    <p>Nothing is sold or shared with anyone.</p>
+
+    <h2>Who can see your island</h2>
+    <p>Anyone visiting GitSpace can see your island, because it is built only from public GitHub data.</p>
+    <p>The site also loads fonts from Google Fonts and avatars from GitHub, so those services see your
+      visit the way they would on any website.</p>
+
+    <h2>Removing your island</h2>
+    <ol>
+      <li>Sign out of GitSpace.</li>
+      <li>Revoke GitSpace's access at <a href="https://github.com/settings/applications">github.com/settings/applications</a>.</li>
+      <li>Open an issue at <a href="https://github.com/ronaksarda/GitSpace/issues">github.com/ronaksarda/GitSpace/issues</a> and we will delete your island.</li>
+    </ol>
+  </main>
+</body>
+
+</html>

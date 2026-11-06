@@ -38,6 +38,7 @@ const ENCRYPTION_KEY = crypto.scryptSync(sessionSecret, 'gitspace_token_encrypti
 
 let cachedSandboxData = null;
 let lastLoadedTime = 0;
+let sandboxLoadFailed = false;
 
 function loadSandboxData() {
     try {
@@ -46,11 +47,13 @@ function loadSandboxData() {
             if (!cachedSandboxData || stats.mtimeMs !== lastLoadedTime) {
                 cachedSandboxData = JSON.parse(fs.readFileSync(SANDBOX_FILE, 'utf8'));
                 lastLoadedTime = stats.mtimeMs;
+                sandboxLoadFailed = false;
             }
             return cachedSandboxData;
         }
     } catch (e) {
         console.error('[SandboxDB] Failed to load sandbox data:', e.message);
+        sandboxLoadFailed = true;
     }
     if (!cachedSandboxData) {
         cachedSandboxData = { sessions: {}, users: {}, repos: [] };
@@ -105,8 +108,13 @@ function buildSandboxTrie(data) {
 
 function saveSandboxData(data) {
     cachedSandboxData = data;
+    if (sandboxLoadFailed) {
+        console.error('[SandboxDB] Not saving: existing sandbox file could not be parsed. Fix or remove it.');
+        return;
+    }
     try {
-        fs.writeFileSync(SANDBOX_FILE, JSON.stringify(data, null, 2), 'utf8');
+        fs.writeFileSync(SANDBOX_FILE + '.tmp', JSON.stringify(data, null, 2), 'utf8');
+        fs.renameSync(SANDBOX_FILE + '.tmp', SANDBOX_FILE);
         try {
             lastLoadedTime = fs.statSync(SANDBOX_FILE).mtimeMs;
         } catch (err) {
@@ -167,6 +175,11 @@ async function initDb() {
             console.error(`[DB] Connection failed. Retries left: ${retries - 1}. Error: ${err.message}`);
             retries--;
             if (retries === 0) {
+                if (process.env.NODE_ENV === 'production') {
+                    // Render's disk is wiped on every deploy, so a sandbox fallback would silently lose data
+                    console.error('[DB] FATAL: Could not connect to database. Exiting.');
+                    process.exit(1);
+                }
                 console.error('[DB] FATAL: Could not connect to database to initialize schema. Auto-falling back to Sandbox mode!');
                 isSandbox = true;
                 const data = loadSandboxData();
@@ -242,7 +255,7 @@ async function initDb() {
         await client.query(`CREATE INDEX IF NOT EXISTS idx_users_cx_cy ON users (cx, cy);`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_repos_login ON repos (login);`);
         await client.query(`CREATE INDEX IF NOT EXISTS idx_repos_name_btree ON repos (name);`);
-        await client.query(`CREATE INDEX IF NOT EXISTS idx_users_login_btree ON users (login);`);
+        await client.query(`DROP INDEX IF EXISTS idx_users_login_btree;`).catch(() => {});
 
         console.log('[DB] PostgreSQL Schema Ready.');
     } catch (err) {
@@ -281,45 +294,6 @@ async function getSessionById(sid) {
     if (res.rows.length === 0) return null;
     const row = res.rows[0];
     return { ...row, token: decryptToken(row.token) };
-}
-
-async function getSessionByState(state) {
-    if (isSandbox) {
-        if (!state) return null;
-        const data = loadSandboxData();
-        const session = Object.values(data.sessions).find(s => s.state === state);
-        if (!session) return null;
-        return { ...session, token: decryptToken(session.token) };
-    }
-    if (!state) return null;
-    const res = await pool.query(`SELECT sid, state, token, created_at FROM sessions WHERE state = $1`, [state]);
-    if (res.rows.length === 0) return null;
-    const row = res.rows[0];
-    return { ...row, token: decryptToken(row.token) };
-}
-
-async function updateSessionToken(sid, token) {
-    if (isSandbox) {
-        const data = loadSandboxData();
-        if (data.sessions[sid]) {
-            data.sessions[sid].token = encryptToken(token);
-            saveSandboxData(data);
-        }
-        return;
-    }
-    await pool.query(`UPDATE sessions SET token = $1 WHERE sid = $2`, [encryptToken(token), sid]);
-}
-
-async function updateSessionState(sid, state) {
-    if (isSandbox) {
-        const data = loadSandboxData();
-        if (data.sessions[sid]) {
-            data.sessions[sid].state = state;
-            saveSandboxData(data);
-        }
-        return;
-    }
-    await pool.query(`UPDATE sessions SET state = $1 WHERE sid = $2`, [state, sid]);
 }
 
 async function deleteSession(sid) {
@@ -453,7 +427,6 @@ async function getChunks(minX, minY, maxX, maxY) {
     if (isSandbox) {
         const data = loadSandboxData();
         const userMap = {};
-        const logins = [];
         const ONE_WEEK_MS = 7 * 24 * 3600 * 1000;
         const now = Date.now();
 
@@ -467,7 +440,6 @@ async function getChunks(minX, minY, maxX, maxY) {
                     isActive: (now - (u.last_login || u.first_seen || 0)) < ONE_WEEK_MS,
                     buildings: []
                 };
-                logins.push(u.login);
             }
         }
 
@@ -498,6 +470,7 @@ async function getChunks(minX, minY, maxX, maxY) {
             SELECT login, cx, cy, avatar, primary_language, first_seen, last_login 
             FROM users 
             WHERE cx >= $1 AND cx <= $2 AND cy >= $3 AND cy <= $4
+            LIMIT 1000
         `, [qMinX, qMaxX, qMinY, qMaxY]);
 
         if (usersRes.rows.length === 0) return { users: {} };
@@ -636,17 +609,16 @@ async function getCitizens(limit = 50, offset = 0) {
     return res.rows;
 }
 
+// Visitors start in open sky beside a random island, so no one person is featured.
 async function getSpawnPoint() {
+    let u;
     if (isSandbox) {
-        const data = loadSandboxData();
-        const users = Object.values(data.users);
-        if (users.length > 0) {
-            return { x: users[0].cx, y: users[0].cy };
-        }
-        return { x: 0, y: 0 };
+        const users = Object.values(loadSandboxData().users);
+        u = users[Math.floor(Math.random() * users.length)];
+    } else {
+        u = (await pool.query('SELECT cx, cy FROM users ORDER BY random() LIMIT 1')).rows[0];
     }
-    const res = await pool.query(`SELECT cx as x, cy as y FROM users ORDER BY last_login DESC LIMIT 1`);
-    return res.rows[0] || { x: 0, y: 0 };
+    return u ? { x: u.cx, y: u.cy + 900 } : { x: 0, y: 0 };
 }
 
 async function searchGlobal(q) {
@@ -675,29 +647,27 @@ async function searchGlobal(q) {
         }
         return matches;
     }
-    if (!isSandbox) {
-        const usersRes = await pool.query(`SELECT login, avatar, cx, cy FROM users WHERE login ILIKE $1 LIMIT 10`, [q]);
-        const reposRes = await pool.query(`
-            SELECT r.name, r.language, r.url, r.login, r.size, r.stars, r.isfork, r.description, r.updated_at, r.x, r.y, r.radius, u.avatar, u.cx, u.cy 
-            FROM repos r 
-            JOIN users u ON r.login = u.login 
-            WHERE r.name ILIKE $1
-            LIMIT 10
-        `, [q]);
+    const usersRes = await pool.query(`SELECT login, avatar, cx, cy FROM users WHERE login ILIKE $1 LIMIT 10`, [q]);
+    const reposRes = await pool.query(`
+        SELECT r.name, r.language, r.url, r.login, r.size, r.stars, r.isfork, r.description, r.updated_at, r.x, r.y, r.radius, u.avatar, u.cx, u.cy 
+        FROM repos r 
+        JOIN users u ON r.login = u.login 
+        WHERE r.name ILIKE $1
+        LIMIT 10
+    `, [q]);
 
-        const matches = [];
-        for (const u of usersRes.rows) {
-            matches.push({ type: 'user', login: u.login, name: u.login, avatar: u.avatar, x: u.cx, y: u.cy, cx: u.cx, cy: u.cy });
-        }
-        for (const r of reposRes.rows) {
-            matches.push({
-                type: 'repo', id: r.name, login: r.login, name: r.name, language: r.language, url: r.url,
-                size: r.size, stars: r.stars, isFork: r.isfork, description: r.description, updatedAt: r.updated_at, x: r.x, y: r.y, radius: r.radius,
-                avatar: r.avatar, cx: r.cx, cy: r.cy
-            });
-        }
-        return matches;
+    const matches = [];
+    for (const u of usersRes.rows) {
+        matches.push({ type: 'user', login: u.login, name: u.login, avatar: u.avatar, x: u.cx, y: u.cy, cx: u.cx, cy: u.cy });
     }
+    for (const r of reposRes.rows) {
+        matches.push({
+            type: 'repo', id: r.name, login: r.login, name: r.name, language: r.language, url: r.url,
+            size: r.size, stars: r.stars, isFork: r.isfork, description: r.description, updatedAt: r.updated_at, x: r.x, y: r.y, radius: r.radius,
+            avatar: r.avatar, cx: r.cx, cy: r.cy
+        });
+    }
+    return matches;
 }
 
 // Session cleanup — delete sessions older than 24h
@@ -733,34 +703,32 @@ setInterval(() => {
         .catch(err => console.error('[Cleanup] Session cleanup error:', err.message));
 }, 3600000);
 
-async function findFreeSpot(startX, startY, minDistance = 2000) {
+// Islands keep clear of each other based on both sizes (spread = farthest building from centre).
+async function findFreeSpot(startX, startY, newSpread = 800) {
+    let existingUsers;
     if (isSandbox) {
         const data = loadSandboxData();
-        let x = startX, y = startY, step = 0;
-        while (true) {
-            let collision = false;
-            for (const u of Object.values(data.users)) {
-                if (Math.sqrt(Math.pow(u.cx - x, 2) + Math.pow(u.cy - y, 2)) < minDistance) {
-                    collision = true;
-                    break;
-                }
-            }
-            if (!collision) return { x, y };
-            step++;
-            const angle = step * 2.39996;
-            const radius = Math.sqrt(step) * 1000;
-            x = startX + Math.cos(angle) * radius;
-            y = startY + Math.sin(angle) * radius;
+        const spreadOf = {};
+        for (const r of data.repos) {
+            const u = data.users[r.login];
+            if (u) spreadOf[r.login] = Math.max(spreadOf[r.login] || 0, Math.hypot(r.x - u.cx, r.y - u.cy));
         }
+        existingUsers = Object.values(data.users).map(u => ({ cx: u.cx, cy: u.cy, spread: spreadOf[u.login] || 0 }));
+    } else {
+        existingUsers = (await pool.query(`
+            SELECT u.cx, u.cy, COALESCE(MAX(SQRT(POWER(r.x - u.cx, 2) + POWER(r.y - u.cy, 2))), 0) AS spread
+            FROM users u LEFT JOIN repos r ON r.login = u.login
+            GROUP BY u.login, u.cx, u.cy`)).rows.map(u => ({ cx: u.cx, cy: u.cy, spread: Number(u.spread) }));
     }
-    const res = await pool.query('SELECT cx, cy FROM users');
-    const existingUsers = res.rows;
+    // Radius on screen = spread + 60; the rock underside and name sign need ~25% more, plus a sea gap.
+    const clearance = (s) => (Math.max(120, s + 60)) * 1.25;
 
+    const MAX_STEPS = 5000; // ~70k units out; past that just accept the last spot
     let x = startX, y = startY, step = 0;
-    while (true) {
+    while (step < MAX_STEPS) {
         let collision = false;
         for (const u of existingUsers) {
-            if (Math.sqrt(Math.pow(u.cx - x, 2) + Math.pow(u.cy - y, 2)) < minDistance) {
+            if (Math.hypot(u.cx - x, u.cy - y) < clearance(u.spread) + clearance(newSpread) + 250) {
                 collision = true;
                 break;
             }
@@ -768,19 +736,17 @@ async function findFreeSpot(startX, startY, minDistance = 2000) {
         if (!collision) return { x, y };
         step++;
         const angle = step * 2.39996; 
-        const radius = Math.sqrt(step) * 1000;
+        const radius = Math.sqrt(step) * 160; // fine steps so islands pack tightly
         x = startX + Math.cos(angle) * radius;
         y = startY + Math.sin(angle) * radius;
     }
+    return { x, y };
 }
 
 module.exports = {
     initDb,
     createSession,
     getSessionById,
-    getSessionByState,
-    updateSessionToken,
-    updateSessionState,
     deleteSession,
     saveUserLayout,
     getChunks,

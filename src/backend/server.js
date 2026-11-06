@@ -18,7 +18,7 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: isDev ? 100000 : 10000,
+    max: isDev ? 100000 : 50,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many authentication attempts. Try again in 15 minutes.' }
@@ -26,7 +26,7 @@ const authLimiter = rateLimit({
 
 const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: isDev ? 100000 : 10000,
+    max: isDev ? 100000 : 600,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many requests. Try again later.' }
@@ -34,7 +34,7 @@ const apiLimiter = rateLimit({
 
 const heavyLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: isDev ? 100000 : 10000,
+    max: isDev ? 100000 : 60,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Rate limit exceeded for this resource. Try again later.' }
@@ -46,7 +46,7 @@ app.use((req, res, next) => {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    res.setHeader('Content-Security-Policy', "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval' https://api.github.com https://avatars.githubusercontent.com https://github.com https://fonts.googleapis.com https://fonts.gstatic.com https://nominatim.openstreetmap.org https://ipapi.co;");
+    res.setHeader('Content-Security-Policy', "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval' https://api.github.com https://avatars.githubusercontent.com https://github.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com https://nominatim.openstreetmap.org https://ipapi.co; img-src 'self' data: blob: https:;");
     if (process.env.NODE_ENV === 'production') {
         res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
@@ -98,7 +98,7 @@ app.get('/u/:login', apiLimiter, async (req, res) => {
 app.use('/auth', authLimiter);
 app.use('/api', apiLimiter);
 app.use('/', require('./routes/auth')(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL));
-app.use('/', require('./routes/api')(db, CLIENT_ID, CLIENT_SECRET, heavyLimiter));
+app.use('/', require('./routes/api')(db, heavyLimiter));
 
 // 404 fallback
 app.use((req, res) => {
@@ -118,6 +118,7 @@ app.use((err, req, res, next) => {
 
 process.on('uncaughtException', (err) => {
     console.error('[Node] Uncaught Exception:', err);
+    process.exit(1); // state is unknown after an uncaught throw; let Render restart us
 });
 
 process.on('unhandledRejection', (reason, promise) => {
