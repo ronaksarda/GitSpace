@@ -13,8 +13,9 @@ const apply = args.includes('--apply');
 const sandboxFile = args.includes('--sandbox') ? args[args.indexOf('--sandbox') + 1] : null;
 
 // Same rule as findFreeSpot in database.js: radius = spread + 60, plus 25% for the rock underside and sign.
-const clearance = (spread) => Math.max(120, spread + 60) * 1.25;
-const SEA_GAP = 250;
+// Spread is capped at 560 to match the frontend size cap in engine.js buildIsland.
+const clearance = (spread) => Math.max(120, Math.min(spread, 560) + 90) * 1.25;
+const SEA_GAP = 900;
 
 function pack(users) {
     const placed = [];

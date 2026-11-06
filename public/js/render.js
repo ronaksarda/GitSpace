@@ -178,7 +178,7 @@ function drawIsland(island) {
 
 function drawTree(t, scx, scy, grow) {
   const z = camera.zoom;
-  if (z < 0.12) return;
+  if (z < 0.2) return;
   const x = scx + (t.x - camera.x) * z, y = scy + (t.y - camera.y) * z + (window.islandBob || 0);
   if (x < -60 || x > canvas.width + 60 || y < -80 || y > canvas.height + 60) return;
   const s = 14 * t.size * z * grow;
@@ -212,8 +212,10 @@ function drawBuilding(b, scx, scy, grow = 1) {
   const bw = b.width * z * grow, bh = b.height * z * grow, depth = bw * 0.5;
   if (z < 0.05) { ctx.fillStyle = b._wall; ctx.fillRect(bsx - bw / 2, bsy - bh, bw, bh); return; }
 
-  ctx.fillStyle = COZY.shadow;
-  ctx.beginPath(); ctx.ellipse(bsx + depth * 0.5, bsy + 1, bw * 0.75 + depth * 0.4, bw * 0.28, 0, 0, Math.PI * 2); ctx.fill();
+  if (z > 0.25) {
+    ctx.fillStyle = COZY.shadow;
+    ctx.beginPath(); ctx.ellipse(bsx + depth * 0.5, bsy + 1, bw * 0.75 + depth * 0.4, bw * 0.28, 0, 0, Math.PI * 2); ctx.fill();
+  }
 
   const pitched = b.tier === 'hut' || b.tier === 'house';
   const wallH = pitched ? bh * 0.62 : bh;
@@ -244,7 +246,7 @@ function drawBuilding(b, scx, scy, grow = 1) {
     }
   }
 
-  if (z > 0.3 && !b.isFork && bw > 8) {
+  if (z > 0.5 && !b.isFork && bw > 8) {
     ctx.fillStyle = COZY.window;
     const ws = Math.max(2, 3.2 * z), gap = 7 * z;
     const rows = Math.max(1, Math.floor((wallH - (pitched ? wallH * 0.5 : 6 * z)) / gap));
@@ -260,7 +262,7 @@ function drawBuilding(b, scx, scy, grow = 1) {
     ctx.strokeRect(bsx - bw / 2, top, bw, wallH); ctx.globalAlpha = 1;
   }
 
-  if ((z > 0.45 && bw > 4) || isNear) {
+  if ((z > 0.55 && bw > 4 && b.showLabel) || isNear) {
     const fontSize = Math.max(10, 10 * z);
     ctx.font = `500 ${fontSize}px 'Rubik', sans-serif`;
     ctx.textAlign = 'center';

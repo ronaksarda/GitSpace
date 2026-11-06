@@ -63,7 +63,8 @@ genStars();
 function buildIsland(login, userData) {
   const { cx, cy, avatar, primaryLanguage, isActive } = userData;
   // Islands show at most 60 buildings: the most-starred ones (matches the server cap on sync).
-  const allRepos = userData.repos || [];
+  // Forks are someone else's work: they never become buildings.
+  const allRepos = (userData.repos || []).filter(r => !r.isFork && !r.isfork);
   const repos = allRepos.length > 60 ? [...allRepos].sort((a, b) => (b.stars || 0) - (a.stars || 0)).slice(0, 60) : allRepos;
   const color = langColor(primaryLanguage);
   const repoCount = repos.length;
@@ -98,6 +99,19 @@ function buildIsland(login, userData) {
 
   // No spread squeeze: squeezing pushed buildings into each other on 200+ repo accounts. The island grows instead.
   // Edge sits past the outermost building plus its widest footprint, so nothing hangs off the coast.
+  // Size cap: very spread-out layouts (old saves, huge accounts) are scaled down as a whole, buildings included,
+  // so nothing overlaps and no island dwarfs its neighbours.
+  const MAX_SPREAD = 560;
+  if (maxDist > MAX_SPREAD) {
+    const k = MAX_SPREAD / maxDist;
+    for (const b of buildings) {
+      b.x = cx + (b.x - cx) * k; b.y = cy + (b.y - cy) * k;
+      b.width *= Math.max(k, 0.55); b.height *= Math.max(k, 0.55);
+    }
+    maxDist = MAX_SPREAD;
+  }
+  // Only the most-starred buildings carry a name label; labels for all of them cost too much per frame.
+  [...buildings].sort((a, b) => (b.stars || 0) - (a.stars || 0)).slice(0, 8).forEach(b => { b.showLabel = true; });
   const islandRadius = Math.max(120, maxDist + 90);
 
   const img = new Image();

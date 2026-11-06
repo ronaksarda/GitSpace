@@ -396,6 +396,7 @@ module.exports = function (db, heavyLimiter) {
             const existingUser = await db.getUser(userData.login);
             let baseX, baseY;
             // Layout is translation-invariant, so build it at the origin first to learn the island size.
+            reposData = reposData.filter(r => !r.fork); // forks never become buildings
             if (reposData.length > MAX_ISLAND_REPOS) reposData = pickIslandRepos(reposData, await fetchPinnedNames(req.session.token));
             const local = await generateLayoutEngine(reposData, 0, 0);
             const spread = local.repos.reduce((m, r) => Math.max(m, Math.hypot(r.x, r.y)), 0);

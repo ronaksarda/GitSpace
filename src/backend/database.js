@@ -721,14 +721,14 @@ async function findFreeSpot(startX, startY, newSpread = 800) {
             GROUP BY u.login, u.cx, u.cy`)).rows.map(u => ({ cx: u.cx, cy: u.cy, spread: Number(u.spread) }));
     }
     // Radius on screen = spread + 60; the rock underside and name sign need ~25% more, plus a sea gap.
-    const clearance = (s) => (Math.max(120, s + 60)) * 1.25;
+    const clearance = (s) => (Math.max(120, s + 90)) * 1.25;
 
     const MAX_STEPS = 5000; // ~70k units out; past that just accept the last spot
     let x = startX, y = startY, step = 0;
     while (step < MAX_STEPS) {
         let collision = false;
         for (const u of existingUsers) {
-            if (Math.hypot(u.cx - x, u.cy - y) < clearance(u.spread) + clearance(newSpread) + 250) {
+            if (Math.hypot(u.cx - x, u.cy - y) < clearance(Math.min(u.spread, 560)) + clearance(Math.min(newSpread, 560)) + 900) {
                 collision = true;
                 break;
             }
