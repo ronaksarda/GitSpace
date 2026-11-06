@@ -156,7 +156,7 @@ function drawIsland(island) {
   });
   window.islandBob = 0;
 
-  if (z > 0.1) {
+  if (z > 0.1 && !window.__snapshotNoSign) {
     const fs = Math.max(11, 15 * z);
     ctx.font = `600 ${fs}px 'Fredoka', sans-serif`;
     const w = ctx.measureText(login).width + 26 * z;
@@ -502,8 +502,9 @@ function checkProximity() {
 }
 
 // Live picture of someone's island for the postcard. Draws with the same renderer into an offscreen canvas.
-window.renderIslandSnapshot = function (login, width, height) {
-  const island = islands.find(i => i.login === login);
+// target: a login on the map, or an island object from buildIsland. opts.sky = false gives a transparent background.
+window.renderIslandSnapshot = function (target, width, height, opts = {}) {
+  const island = typeof target === 'string' ? islands.find(i => i.login === target) : target;
   if (!island) return null;
   if (!island._rim) prepareIsland(island);
   const off = document.createElement('canvas');
@@ -512,14 +513,17 @@ window.renderIslandSnapshot = function (login, width, height) {
   const saved = { canvas, ctx, cam: { ...camera }, born: island._born, labels: window.drawnLabels, sky: skyGrad, skyH: skyGradH };
   canvas = off; ctx = off.getContext('2d');
   skyGrad = null;
-  const fit = Math.min(off.width, off.height) / (island.islandRadius * 3.1);
+  const fit = Math.min(off.width, off.height) / (island.islandRadius * (opts.fit || 3.1));
+  window.__snapshotNoSign = opts.sign === false;
   camera.x = island.cx; camera.y = island.cy + island.islandRadius * 0.28; camera.zoom = fit;
   island._born = -1e9; // fully grown, no rise-in
   window.drawnLabels = [];
   try {
-    drawNebula(); drawStars(); drawIsland(island);
+    if (opts.sky !== false) { drawNebula(); drawStars(); }
+    drawIsland(island);
   } finally {
     canvas = saved.canvas; ctx = saved.ctx; Object.assign(camera, saved.cam);
+    window.__snapshotNoSign = false;
     island._born = saved.born; window.drawnLabels = saved.labels; skyGrad = saved.sky; skyGradH = saved.skyH;
   }
   off.style.width = width + 'px'; off.style.height = height + 'px';

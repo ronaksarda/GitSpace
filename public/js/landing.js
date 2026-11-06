@@ -1,23 +1,21 @@
-// Front page for signed-out visitors: a six-step scroll story played on the live world behind it.
-// Each step moves the real camera (autopilotTarget / targetCamera from engine.js). The overlay covers
-// the canvas, so visitors scroll the story instead of steering; keys are held back while it's open.
+// Front page for signed-out visitors: a scrolling page over the dusk sky.
+// Hero, then a timeline of what happens once you sign in, then what's coming next.
+// The timeline's line fills as you scroll, so it doubles as the page's scroll indicator.
 // API: window.showLanding(), window.hideLanding()
 (function () {
   'use strict';
 
-  var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var root = null, line = null, steps = [], nav = null;
 
-  var STEPS = [
-    { h: 'Your GitHub, as a little world.', p: 'Sign in and your projects become an island you can fly around.', cta: true },
-    { h: 'Every project is a building.', p: 'The more people save a project, the taller it gets.' },
-    { h: 'Find people like you.', p: 'Same college, same city, same languages.', soon: true },
-    { h: 'Your first open-source PR.', p: 'We\'ll point you to beginner-friendly issues and show where to start.', soon: true },
-    { h: 'Post your island.', p: 'Get a picture of your world to share anywhere.', postcard: true },
-    { h: 'Make yours.', p: 'Sign in with GitHub and your island gets built from your projects.', cta: true, big: true }
+  var TIMELINE = [
+    { when: 'Second one', title: 'Sign in with GitHub', body: 'We read your public projects. Nothing private, and we never post anything for you.' },
+    { when: 'A few seconds later', title: 'Your island is built', body: 'Every project becomes a building. The more people save a project, the taller it stands.' },
+    { when: 'Right away', title: 'Fly around', body: 'Search any developer and fly to their island. Open a building to see the project and a quick health check.' },
+    { when: 'Whenever you like', title: 'Share it', body: 'Download a postcard of your island for LinkedIn, your README, or anywhere else.' },
+    { when: 'Over time', title: 'Your island grows', body: 'Ship something new and refresh. New buildings appear, and the ones people love keep climbing.' },
+    { when: 'Coming next', title: 'Your first open-source PR', body: 'Beginner-friendly issues in languages you already use, with a plain explanation of where to start.', soon: true },
+    { when: 'Coming next', title: 'People like you', body: 'Find developers from your college, your city, or who build with the same tools.', soon: true }
   ];
-
-  var root = null, fill = null, observer = null, active = -1;
-  var hero = null, other = null; // { login, x, y } picked at random from real islands
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -26,110 +24,19 @@
     return n;
   }
 
-  // ---------- picking islands, neutrally ----------
-  function pickIslands() {
-    return fetch('/api/citizens', { headers: { Accept: 'application/json' } })
-      .then(function (r) { return r.ok ? r.json() : []; })
-      .catch(function () { return []; })
-      .then(function (list) {
-        list = Array.isArray(list) ? list.filter(function (c) { return c && c.login && isFinite(c.x) && isFinite(c.y); }) : [];
-        var good = list.filter(function (c) { return c.repoCount >= 15 && c.repoCount <= 60; });
-        if (good.length < 2) good = list.filter(function (c) { return c.repoCount >= 3; });
-        if (!good.length) good = list;
-        var a = good.splice(Math.floor(Math.random() * good.length), 1)[0];
-        var b = good.length ? good[Math.floor(Math.random() * good.length)] : null;
-        hero = a ? { login: a.login, x: a.x, y: a.y } : null;
-        other = b ? { login: b.login, x: b.x, y: b.y } : hero;
-      });
-  }
-  function loaded(spot) {
-    if (!spot || typeof islands === 'undefined') return null;
-    for (var i = 0; i < islands.length; i++) if (islands[i].login === spot.login) return islands[i];
-    return null;
-  }
-
-  // ---------- camera ----------
-  function fly(x, y, zoom) {
-    targetCamera.zoom = zoom;
-    if (REDUCED) {
-      // no flights: cut straight there
-      autopilotTarget = null;
-      player.x = x; player.y = y; player.vx = player.vy = 0;
-      camera.x = targetCamera.x = x; camera.y = targetCamera.y = y;
-      camera.zoom = zoom;
-      return;
-    }
-    autopilotTarget = { x: x, y: y };
-  }
-  function hold(zoom) {
-    autopilotTarget = null;
-    targetCamera.zoom = zoom;
-    if (REDUCED) camera.zoom = zoom;
-  }
-
-  function enter(i) {
-    if (i === active) return;
-    active = i;
-    fill.style.transform = 'scaleY(' + ((i + 1) / STEPS.length) + ')';
-    var isl;
-    switch (i) {
-      case 0: hold(0.45); break;
-      case 1:
-        if (!hero) { hold(0.9); break; }
-        isl = loaded(hero);
-        if (isl && isl.buildings && isl.buildings.length) {
-          // close in on its tallest building
-          var tall = isl.buildings.reduce(function (m, b) { return (b.height || 0) > (m.height || 0) || ((b.height || 0) === (m.height || 0) && (b.stars || 0) > (m.stars || 0)) ? b : m; });
-          fly(tall.x, tall.y + 30, 1.3);
-          if (window.startArrival && Math.hypot(player.x - tall.x, player.y - tall.y) < 1200) window.startArrival(isl);
-        } else {
-          fly(hero.x, hero.y, 1.0); // engine plays the arrival beat itself after a long flight
-        }
-        break;
-      case 2: hold(0.12); break;
-      case 3: if (other) fly(other.x, other.y, 0.6); else hold(0.6); break;
-      case 4: if (hero) fly(hero.x, hero.y, 0.8); else hold(0.8); drawPostcard(); break;
-      case 5: hold(0.35); break;
-    }
-  }
-
-  function drawPostcard(tries) {
-    var card = root && root.querySelector('.gsl-postcard');
-    if (!card) return;
-    var isl = loaded(hero);
-    var snap = isl && typeof window.renderIslandSnapshot === 'function'
-      ? window.renderIslandSnapshot(hero.login, 300, 188) : null;
-    var pic = card.querySelector('.gsl-pc-pic');
-    if (!snap) {
-      // the island streams in as the camera gets close; try again shortly
-      if ((tries || 0) < 8 && active === 4) setTimeout(function () { drawPostcard((tries || 0) + 1); }, 700);
-      return;
-    }
-    pic.textContent = '';
-    pic.appendChild(snap);
-    card.querySelector('.gsl-pc-name').textContent = isl.login;
-    card.querySelector('.gsl-pc-line').textContent =
-      isl.repoCount + (isl.repoCount === 1 ? ' project, ' : ' projects, ') +
-      (isl.totalStars || 0).toLocaleString('en-US') + ((isl.totalStars || 0) === 1 ? ' star' : ' stars');
-    card.hidden = false;
-  }
-
-  // ---------- DOM ----------
-  function actions(big) {
-    var row = el('div', 'gsl-actions' + (big ? ' gsl-actions-big' : ''));
+  function actions(extra) {
+    var row = el('div', 'gsl-actions' + (extra ? ' ' + extra : ''));
     var sign = el('a', 'gsl-btn gsl-btn-primary', 'Sign in with GitHub');
     sign.href = '/auth/github';
-    var explore = el('button', 'gsl-btn gsl-btn-quiet', 'Explore first');
-    explore.type = 'button';
-    // Signed-in people open this from the menu; for them both buttons just return to the map.
     sign.addEventListener('click', function (e) {
       if (window.currentUserLogin) { e.preventDefault(); window.hideLanding(); }
     });
+    var explore = el('button', 'gsl-btn gsl-btn-quiet', 'Look around first');
+    explore.type = 'button';
     explore.addEventListener('click', function () {
       window.hideLanding();
       if (!window.currentUserLogin && window.startGuestExplore) window.startGuestExplore();
     });
-    row.dataset.gslActions = '1';
     row.appendChild(sign);
     row.appendChild(explore);
     return row;
@@ -138,54 +45,96 @@
   function build() {
     root = el('div', 'gsl');
     root.setAttribute('role', 'region');
-    root.setAttribute('aria-label', 'What GitSpace is');
+    root.setAttribute('aria-label', 'About GitSpace');
     root.tabIndex = -1;
 
-    STEPS.forEach(function (s, i) {
-      var sec = el('section', 'gsl-step' + (s.postcard ? ' gsl-step-postcard' : ''));
-      sec.dataset.i = i;
-      var card = el('div', 'gsl-card' + (i === 0 ? ' gsl-drop' : '') + (s.big ? ' gsl-card-big' : ''));
-      card.appendChild(el(i === 0 ? 'h1' : 'h2', 'gsl-h', s.h));
-      card.appendChild(el('p', 'gsl-p', s.p));
-      if (s.soon) card.appendChild(el('p', 'gsl-soon', 'Coming soon'));
-      if (s.cta) card.appendChild(actions(s.big));
-      if (i === 0) {
-        var cue = el('p', 'gsl-cue', 'Scroll to see how it works');
-        card.appendChild(cue);
-      }
-      if (s.postcard) {
-        var pc = el('figure', 'gsl-postcard');
-        pc.hidden = true;
-        pc.setAttribute('aria-label', 'Example postcard of a real island');
-        pc.appendChild(el('div', 'gsl-pc-pic'));
-        var cap = el('figcaption', 'gsl-pc-cap');
-        cap.appendChild(el('span', 'gsl-pc-name'));
-        cap.appendChild(el('span', 'gsl-pc-line'));
-        pc.appendChild(cap);
-        sec.appendChild(pc);
-      }
-      sec.appendChild(card);
-      root.appendChild(sec);
-    });
+    nav = el('header', 'gsl-nav');
+    nav.appendChild(el('div', 'gsl-logo', 'GitSpace'));
+    var navSign = el('a', 'gsl-nav-link', 'Sign in');
+    navSign.href = '/auth/github';
+    nav.appendChild(navSign);
+    root.appendChild(nav);
 
-    var track = el('div', 'gsl-track');
-    track.setAttribute('aria-hidden', 'true');
-    fill = el('span', 'gsl-fill');
-    track.appendChild(fill);
-    root.appendChild(track);
+    var hero = el('section', 'gsl-hero');
+    hero.appendChild(el('h1', 'gsl-h1', 'Your GitHub, built into a little world.'));
+    hero.appendChild(el('p', 'gsl-lead', 'Every project you make becomes a building on your own floating island. Fly around, drop in on other developers, and share a picture of yours.'));
+    hero.appendChild(actions());
+    var proof = el('p', 'gsl-proof');
+    proof.hidden = true;
+    hero.appendChild(proof);
+    hero.appendChild(el('p', 'gsl-scroll-hint', 'What happens when you sign in'));
+    root.appendChild(hero);
+
+    var tl = el('section', 'gsl-tl');
+    tl.setAttribute('aria-label', 'What happens over time');
+    var rail = el('div', 'gsl-tl-rail');
+    line = el('div', 'gsl-tl-fill');
+    rail.appendChild(line);
+    tl.appendChild(rail);
+    var list = el('ol', 'gsl-tl-list');
+    TIMELINE.forEach(function (s) {
+      var li = el('li', 'gsl-tl-step' + (s.soon ? ' is-soon' : ''));
+      li.appendChild(el('span', 'gsl-tl-dot'));
+      li.appendChild(el('p', 'gsl-tl-when', s.when));
+      li.appendChild(el('h3', 'gsl-tl-title', s.title));
+      li.appendChild(el('p', 'gsl-tl-body', s.body));
+      list.appendChild(li);
+      steps.push(li);
+    });
+    tl.appendChild(list);
+    root.appendChild(tl);
+
+    var end = el('section', 'gsl-end');
+    end.appendChild(el('h2', 'gsl-end-title', 'Make yours.'));
+    end.appendChild(el('p', 'gsl-lead', 'It takes one click and a few seconds.'));
+    end.appendChild(actions('gsl-center-row'));
+    root.appendChild(end);
+
+    var foot = el('footer', 'gsl-foot');
+    var priv = el('a', null, 'What we read from GitHub');
+    priv.href = '/privacy.html';
+    var src = el('a', null, 'Source on GitHub');
+    src.href = 'https://github.com/ronaksarda/GitSpace';
+    src.target = '_blank';
+    src.rel = 'noopener';
+    foot.appendChild(priv);
+    foot.appendChild(src);
+    root.appendChild(foot);
 
     document.body.appendChild(root);
+    root.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
 
-    observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (e) { if (e.isIntersecting) enter(+e.target.dataset.i); });
-    }, { root: root, threshold: 0.55 });
-    root.querySelectorAll('.gsl-step').forEach(function (s) { observer.observe(s); });
+    fetch('/api/stats', { headers: { Accept: 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (s) {
+        if (!s || !s.totalUsers) return;
+        proof.textContent = s.totalUsers.toLocaleString('en-US') + ' developers and ' + (s.totalRepos || 0).toLocaleString('en-US') + ' projects on the map so far.';
+        proof.hidden = false;
+      })
+      .catch(function () {});
   }
 
-  // The world's own keyboard controls (arrows, WASD, shortcuts) stay off while the story is open.
-  // Default actions still run, so arrow keys and Space scroll the story and Enter activates buttons.
+  // Fill the timeline line up to the middle of the screen and light each step as the line reaches it.
+  function onScroll() {
+    if (!root || root.hidden) return;
+    nav.classList.toggle('is-solid', root.scrollTop > 24);
+    var rail = line.parentNode.getBoundingClientRect();
+    var mid = window.innerHeight * 0.55;
+    var filled = Math.max(0, Math.min(rail.height, mid - rail.top));
+    line.style.transform = 'scaleY(' + (rail.height ? filled / rail.height : 0) + ')';
+    steps.forEach(function (s) {
+      var dot = s.querySelector('.gsl-tl-dot').getBoundingClientRect();
+      s.classList.toggle('is-on', dot.top + dot.height / 2 <= mid);
+    });
+  }
+
   function holdKeys(e) {
-    if (root && !root.hidden) e.stopImmediatePropagation();
+    // The world behind must not react while the page is open. Page keys still scroll and activate.
+    if (!root || root.hidden) return;
+    var pageKeys = ['Tab', 'Enter', ' ', 'PageDown', 'PageUp', 'Home', 'End', 'ArrowDown', 'ArrowUp'];
+    if (pageKeys.indexOf(e.key) === -1) e.stopImmediatePropagation();
+    else e.stopPropagation();
   }
 
   window.showLanding = function () {
@@ -195,22 +144,17 @@
     var signedIn = !!window.currentUserLogin;
     root.querySelectorAll('.gsl-btn-primary').forEach(function (b) { b.textContent = signedIn ? 'Back to the map' : 'Sign in with GitHub'; });
     root.querySelectorAll('.gsl-btn-quiet').forEach(function (b) { b.hidden = signedIn; });
+    nav.querySelector('.gsl-nav-link').hidden = signedIn;
     root.scrollTop = 0;
-    active = -1;
+    onScroll();
     window.addEventListener('keydown', holdKeys, true);
     window.addEventListener('keyup', holdKeys, true);
     root.focus({ preventScroll: true });
-    pickIslands().then(function () {
-      // re-run the step we're on now that we know where to fly
-      var cur = active; active = -1; enter(cur < 0 ? 0 : cur);
-    });
   };
 
   window.hideLanding = function () {
     if (!root || root.hidden) return;
     root.hidden = true;
-    active = -1;
-    autopilotTarget = null;
     window.removeEventListener('keydown', holdKeys, true);
     window.removeEventListener('keyup', holdKeys, true);
   };
