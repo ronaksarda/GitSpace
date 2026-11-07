@@ -1,0 +1,2 @@
+/* Most styling lives in the MUI theme (theme.js). This file only holds what must exist before React mounts. */
+kbd { font-family: inherit; }

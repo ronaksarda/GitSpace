@@ -7,16 +7,29 @@
   },
   "scripts": {
     "start": "node src/backend/server.js",
-    "build": "g++ -O2 -std=c++17 -o src/engine/gitspace_engine src/engine/main.cpp || echo \"engine build skipped, JS fallback\"",
+    "build": "(g++ -O2 -std=c++17 -o src/engine/gitspace_engine src/engine/main.cpp || echo \"engine build skipped, JS fallback\") && vite build",
     "seed:stress": "node src/backend/scripts/seed_stress.js",
     "compact": "node src/backend/scripts/compact_islands.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "build:web": "vite build",
+    "dev:web": "vite build --watch",
+    "postinstall": "vite build"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^9.5.0",
+    "@vitejs/plugin-react": "^6.2.1",
+    "animejs": "^4.5.0",
     "compression": "^1.8.1",
+    "dompurify": "^3.4.17",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^8.5.2",
-    "pg": "^8.13.1"
+    "marked": "^18.1.3",
+    "pg": "^8.13.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vite": "^8.3.6"
   }
 }

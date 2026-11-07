@@ -530,13 +530,14 @@ window.renderIslandSnapshot = function (target, width, height, opts = {}) {
   return off;
 };
 
-// Cinematic arrival: letterbox bars, a title card, the camera settles and the island's buildings rise again.
+// Arrival: letterbox bars while the camera settles and the buildings rise again. The title card is DOM (React listens for gs:arrival).
 let arrival = null;
 window.startArrival = function (island) {
   if (!island) return;
   arrival = { island, t0: performance.now() };
   island._born = performance.now() + 250;
   targetCamera.zoom = Math.max(0.25, Math.min(1.2, Math.min(canvas.width, canvas.height) / (island.islandRadius * 2.6)));
+  window.dispatchEvent(new CustomEvent('gs:arrival', { detail: { login: island.login, repoCount: island.repoCount, totalStars: island.totalStars || 0 } }));
 };
 function drawArrival() {
   if (!arrival) return;
@@ -547,18 +548,4 @@ function drawArrival() {
   const bar = canvas.height * 0.08 * e;
   ctx.fillStyle = '#16132B';
   ctx.fillRect(0, 0, canvas.width, bar); ctx.fillRect(0, canvas.height - bar, canvas.width, bar);
-  const isl = arrival.island, cx = canvas.width / 2, y = canvas.height * 0.22;
-  ctx.globalAlpha = e; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
-  ctx.font = "500 15px 'Rubik', sans-serif"; ctx.fillStyle = COZY.cream;
-  ctx.fillText('Arriving at', cx, y - 34);
-  const size = Math.min(56, canvas.width / 12);
-  ctx.font = `600 ${size}px 'Fredoka', sans-serif`;
-  ctx.lineWidth = 6; ctx.strokeStyle = COZY.ink; ctx.strokeText(isl.login, cx, y + size * 0.35);
-  ctx.fillStyle = COZY.cream; ctx.fillText(isl.login, cx, y + size * 0.35);
-  const p = window.profileCache && window.profileCache[isl.login];
-  const facts = [`${isl.repoCount} ${isl.repoCount === 1 ? 'repo' : 'repos'}`, `${(isl.totalStars || 0).toLocaleString()} stars`];
-  if (p && p.location) facts.push(p.location.trim());
-  ctx.font = "500 15px 'Rubik', sans-serif"; ctx.globalAlpha = e * 0.85;
-  ctx.fillText(facts.join(', '), cx, y + size * 0.35 + 30);
-  ctx.globalAlpha = 1;
 }

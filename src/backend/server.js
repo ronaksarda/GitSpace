@@ -46,7 +46,7 @@ app.use((req, res, next) => {
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    res.setHeader('Content-Security-Policy', "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval' https://api.github.com https://avatars.githubusercontent.com https://github.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com https://nominatim.openstreetmap.org https://ipapi.co; img-src 'self' data: blob: https:;");
+    res.setHeader('Content-Security-Policy', "default-src 'self' data: blob: 'unsafe-inline' 'unsafe-eval' https://api.github.com https://avatars.githubusercontent.com https://github.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com https://api.fontshare.com https://cdn.fontshare.com https://nominatim.openstreetmap.org https://ipapi.co; img-src 'self' data: blob: https:;");
     if (process.env.NODE_ENV === 'production') {
         res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
@@ -54,12 +54,16 @@ app.use((req, res, next) => {
 });
 
 // Static files
+const APP_BUNDLE_DIR = path.join(__dirname, '../../public/app') + path.sep;
 app.use(express.static(path.join(__dirname, '../../public'), {
     etag: true,
     lastModified: true,
     setHeaders: (res, filePath) => {
+        // The React bundle keeps fixed names (public/app/app.js): revalidate with the etag instead of caching for a year
         if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        } else if (filePath.startsWith(APP_BUNDLE_DIR)) {
+            res.setHeader('Cache-Control', 'no-cache');
         } else if (filePath.match(/\.(js|css)$/)) {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         } else {

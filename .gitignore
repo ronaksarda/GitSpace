@@ -36,3 +36,4 @@ lerna-debug.log*
 .DS_Store
 Thumbs.db
 src/backend/scripts/seed_sandbox.js
+public/app/

@@ -5,13 +5,14 @@ window.addEventListener('resize', () => {
 
 window.addEventListener('keydown', e => {
   if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) && e.target.type !== 'range') return;
+  if (window.gsModalOpen) return; // a panel is open; keys belong to it, not the ship
 
   const key = e.key.toLowerCase();
   keys[key] = true;
 
   // Shortcuts overlay toggle
   if (key === '?' || (key === 'h' && !e.ctrlKey)) {
-    toggleShortcutsOverlay();
+    if (window.toggleShortcuts) window.toggleShortcuts();
     return;
   }
 
@@ -31,16 +32,6 @@ window.addEventListener('keydown', e => {
     return;
   }
 
-  if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
-    hideShortcutsOverlay();
-  }
-
-  if (key === 'escape') {
-    document.getElementById('repo-modal')?.classList.add('hidden');
-    document.getElementById('profile-modal')?.classList.add('hidden');
-    document.getElementById('citizens-sidebar')?.classList.add('hidden');
-    hideShortcutsOverlay();
-  }
 });
 
 window.addEventListener('keyup', e => {
@@ -130,32 +121,6 @@ window.addEventListener('mousemove', e => {
   lastMouse.y = e.clientY;
 });
 
-let shortcutsVisible = false;
-let shortcutsAutoHide = null;
-
-function toggleShortcutsOverlay() {
-  const overlay = document.getElementById('shortcuts-overlay');
-  if (!overlay) return;
-  shortcutsVisible = !shortcutsVisible;
-  if (shortcutsVisible) {
-    overlay.classList.remove('hidden');
-    overlay.classList.add('visible');
-    clearTimeout(shortcutsAutoHide);
-    shortcutsAutoHide = setTimeout(hideShortcutsOverlay, 6000);
-  } else {
-    hideShortcutsOverlay();
-  }
-}
-
-function hideShortcutsOverlay() {
-  const overlay = document.getElementById('shortcuts-overlay');
-  if (!overlay) return;
-  shortcutsVisible = false;
-  overlay.classList.remove('visible');
-  overlay.classList.add('hidden');
-  clearTimeout(shortcutsAutoHide);
-}
-
 function captureScreenshot() {
   try {
     const tempCanvas = document.createElement('canvas');
@@ -177,156 +142,6 @@ function captureScreenshot() {
   } catch (err) {
     showToast('Screenshot failed. Try again.');
   }
-}
-
-function showProfileModal(island) {
-  document.getElementById('pm-avatar').src = island.avatar || 'https://avatars.githubusercontent.com/' + encodeURIComponent(island.login) + '?s=80';
-  document.getElementById('pm-name').textContent = island.login;
-  document.getElementById('pm-repos').textContent = island.repoCount + (island.repoCount === 1 ? ' repo' : ' repos');
-  document.getElementById('pm-stars').textContent = (island.totalStars || 0).toLocaleString() + ' stars';
-
-  const topReposEl = document.getElementById('pm-top-repos');
-  if (topReposEl) {
-    const sorted = [...island.buildings].sort((a, b) => b.stars - a.stars).slice(0, 5);
-    if (sorted.length === 0) {
-      topReposEl.innerHTML = '<div class="pm-repo-item muted">No public repos yet</div>';
-    } else {
-      topReposEl.innerHTML = sorted.map(r =>
-        `<div class="pm-repo-item">
-          <span class="pm-repo-dot" style="background:${langColor(r.language)}"></span>
-          <span class="pm-repo-name">${escapeHTML(r.name)}</span>
-          <span class="pm-repo-stars">${(r.stars || 0).toLocaleString()} stars</span>
-        </div>`
-      ).join('');
-    }
-  }
-
-  drawLanguagePie(island.buildings);
-
-  // Share button
-  const shareBtn = document.getElementById('pm-btn-share');
-  if (shareBtn) {
-    shareBtn.onclick = () => {
-      const url = window.location.origin + '/?fly=' + encodeURIComponent(island.login);
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(url).then(() => {
-          if (window.showToast) window.showToast('Profile link copied');
-        }).catch(() => {
-          if (window.showToast) window.showToast('Copy failed');
-        });
-      } else {
-        const textArea = document.createElement("textarea");
-        textArea.value = url;
-        textArea.style.position = "fixed";
-        textArea.style.left = "-999999px";
-        textArea.style.top = "-999999px";
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        try {
-          document.execCommand('copy');
-          if (window.showToast) window.showToast('Profile link copied');
-        } catch (err) {
-          if (window.showToast) window.showToast('Copy failed');
-        }
-        textArea.remove();
-      }
-    };
-  }
-
-  document.getElementById('profile-modal').classList.remove('hidden');
-
-  document.getElementById('pm-btn-github').onclick = () => window.open('https://github.com/' + island.login, '_blank');
-  document.getElementById('pm-btn-travel').onclick = () => {
-    document.getElementById('profile-modal').classList.add('hidden');
-    document.getElementById('citizens-sidebar').classList.add('hidden');
-    flyTo(island.cx, island.cy, null);
-  };
-}
-
-function drawLanguagePie(buildings) {
-  const pieCanvas = document.getElementById('pm-pie-chart');
-  if (!pieCanvas) return;
-
-  const pctx = pieCanvas.getContext('2d');
-  const size = pieCanvas.width;
-  const cx = size / 2;
-  const cy = size / 2;
-  const radius = size / 2 - 8;
-
-  pctx.clearRect(0, 0, size, size);
-
-  const langCounts = {};
-  for (const b of buildings) {
-    const lang = b.language || 'Other';
-    langCounts[lang] = (langCounts[lang] || 0) + 1;
-  }
-
-  const total = buildings.length;
-  const legendEl = document.getElementById('pm-pie-legend');
-  
-  if (total === 0) {
-    if (legendEl) legendEl.innerHTML = '<div class="pie-legend-item muted">No repos</div>';
-    return;
-  }
-
-  let startAngle = -Math.PI / 2;
-  const entries = Object.entries(langCounts).sort((a, b) => b[1] - a[1]);
-
-  for (const [lang, count] of entries) {
-    const sliceAngle = (count / total) * Math.PI * 2;
-    pctx.beginPath();
-    pctx.moveTo(cx, cy);
-    pctx.arc(cx, cy, radius, startAngle, startAngle + sliceAngle);
-    pctx.closePath();
-    pctx.fillStyle = langColor(lang);
-    pctx.fill();
-    startAngle += sliceAngle;
-  }
-
-  // Center cutout
-  pctx.beginPath();
-  pctx.arc(cx, cy, radius * 0.55, 0, Math.PI * 2);
-  pctx.fillStyle = '#FFF4E6';
-  pctx.fill();
-
-  pctx.fillStyle = '#2B2340';
-  pctx.font = '600 16px Rubik, sans-serif';
-  pctx.textAlign = 'center';
-  pctx.textBaseline = 'middle';
-  pctx.fillText(total, cx, cy - 6);
-  pctx.fillStyle = '#6B5E80';
-  pctx.font = '11px Rubik, sans-serif';
-  pctx.fillText('repos', cx, cy + 8);
-
-  if (legendEl) {
-    legendEl.innerHTML = entries.slice(0, 6).map(([lang, count]) =>
-      `<div class="pie-legend-item">
-        <span class="pie-legend-dot" style="background:${langColor(lang)}"></span>
-        <span>${escapeHTML(lang)}</span>
-        <span class="pie-legend-pct">${Math.round(count / total * 100)}%</span>
-      </div>`
-    ).join('');
-  }
-}
-
-function formatSize(kb) {
-  if (!kb) return '0 KB';
-  if (kb < 1024) return kb + ' KB';
-  if (kb < 1024 * 1024) return (kb / 1024).toFixed(1) + ' MB';
-  return (kb / 1024 / 1024).toFixed(1) + ' GB';
-}
-
-function timeAgo(dateStr) {
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return 'Unknown';
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return 'Just now';
-  if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
-  if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
-  if (seconds < 2592000) return Math.floor(seconds / 86400) + 'd ago';
-  if (seconds < 31536000) return Math.floor(seconds / 2592000) + 'mo ago';
-  return Math.floor(seconds / 31536000) + 'y ago';
 }
 
 let previousTouch = null;

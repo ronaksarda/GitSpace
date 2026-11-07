@@ -127,24 +127,11 @@ function buildIsland(login, userData) {
   };
 }
 
-let currentTerritory = null;
+// The React UI reads this for the bottom-left readout.
+window.gsHud = { island: null, x: 0, y: 0 };
 
 function updateHUD() {
-  const loginScreen = document.getElementById('login-screen');
-  if (loginScreen && !loginScreen.classList.contains('hidden')) {
-    return;
-  }
-
-  const hudBl = document.getElementById('hud-bl');
-  const hudBr = document.getElementById('hud-br');
-  if (hudBl && hudBr) {
-    const hudY = window.innerHeight - (isMobile() ? 60 : 30);
-    hudBl.style.bottom = (window.innerHeight - hudY) + 'px';
-    hudBr.style.bottom = (window.innerHeight - hudY) + 'px';
-  }
-
-  document.getElementById('hud-coords').textContent = `X: ${Math.round(player.x)} Y: ${Math.round(player.y)}`;
-
+  if (window.gsFrontPage) return;
   let newNearestIsland = null;
   let newNearestDist = Infinity;
   for (const island of islands) {
@@ -153,33 +140,11 @@ function updateHUD() {
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist < newNearestDist) { newNearestDist = dist; newNearestIsland = island; }
   }
-
   nearestIsland = newNearestIsland;
   nearestDist = newNearestDist;
-
-  let inTerritory = null;
-  if (nearestIsland && nearestDist < nearestIsland.islandRadius * 1.2) {
-    document.getElementById('hud-island').textContent = nearestIsland.login + "'s Island";
-    inTerritory = nearestIsland.login;
-  } else {
-    document.getElementById('hud-island').textContent = 'Deep Space';
-  }
-
-  if (inTerritory !== currentTerritory) {
-    currentTerritory = inTerritory;
-    const banner = document.getElementById('territory-banner');
-    if (banner) {
-      if (currentTerritory) {
-        document.getElementById('tb-name').textContent = currentTerritory + "'s Island";
-        banner.classList.remove('hidden');
-        // Auto-hide after 4 seconds
-        clearTimeout(window.territoryBannerTimeout);
-        window.territoryBannerTimeout = setTimeout(() => banner.classList.add('hidden'), 4000);
-      } else {
-        banner.classList.add('hidden');
-      }
-    }
-  }
+  window.gsHud.x = Math.round(player.x);
+  window.gsHud.y = Math.round(player.y);
+  window.gsHud.island = nearestIsland && nearestDist < nearestIsland.islandRadius * 1.2 ? nearestIsland.login : null;
 }
 
 let autopilotTarget = null;
@@ -396,3 +361,16 @@ window.startGuestExplore = function () {
   window.guestExplore = true;
 };
 window.stopGuestExplore = function () { window.guestExplore = false; };
+
+// Hooks for the React UI (public/app): fly somewhere, and read the live world without touching engine globals by name.
+window.flyTo = function (x, y, item) {
+  if (typeof item === 'string') { try { item = JSON.parse(item); } catch (e) { item = null; } }
+  if (isNaN(x) || isNaN(y)) { x = 0; y = 0; }
+  autopilotTarget = { x, y, item: item || null };
+};
+window.gsWorld = {
+  get islands() { return islands; },
+  get player() { return player; },
+  get camera() { return camera; },
+  get canvas() { return canvas; },
+};
