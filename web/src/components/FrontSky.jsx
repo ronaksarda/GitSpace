@@ -115,7 +115,7 @@ export default function FrontSky({ scroller }) {
       <Box component="canvas" ref={cv} sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0 }} />
       <Box component="svg" ref={svgRef} xmlns="http://www.w3.org/2000/svg" sx={{
         position: 'absolute', left: 0, top: 0, overflow: 'visible', willChange: 'transform',
-        '& path': { fill: 'none', stroke: 'rgba(175,195,255,.2)', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' },
+        '& path': { fill: 'none', stroke: 'rgba(175,195,255,.16)', strokeWidth: 1, vectorEffect: 'non-scaling-stroke' },
       }} />
     </Box>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box } from '@mui/material';
 import { t } from '../theme.js';
-import { fmt, getJSON, plural, topRepos } from '../lib.js';
+import { fmt, getJSON, topRepos } from '../lib.js';
 import { renderPostcard } from '../postcard.js';
 
 const userFetches = new Map();
@@ -23,7 +23,6 @@ export function buildingPoint(island, b, w, h, fit) {
   return { x: w / 2 + (b.x - island.cx) * z, y: h / 2 + (b.y - island.cy - island.islandRadius * 0.28) * z - b.height * z };
 }
 
-const mostly = (lang, n) => (lang && lang !== 'Other' ? `${plural(n, 'project', 'projects')}, mostly ${lang}` : plural(n, 'project', 'projects'));
 
 const h2 = { m: 0, fontSize: { xs: 32, md: 48 }, fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05 };
 const lede = { m: 0, mt: 2, color: t.muted, fontSize: { xs: 16, md: 18 }, lineHeight: 1.55, maxWidth: 520 };
@@ -31,7 +30,7 @@ const lede = { m: 0, mt: 2, color: t.muted, fontSize: { xs: 16, md: 18 }, lineHe
 /* ---------- Profile vs island ---------- */
 
 export function Compare({ dev }) {
-  const [split, setSplit] = useState(50);
+  const [split, setSplit] = useState(() => (window.innerWidth < 600 ? 34 : 50)); // phones: more room for the island
   const box = useRef(null);
   const [labels, setLabels] = useState([]);
   const FIT = 3.1;
@@ -48,10 +47,10 @@ export function Compare({ dev }) {
       el.replaceChildren(c);
       const [top] = topRepos(island.buildings, 1);
       const other = island.buildings.find(b => b !== top && b.language !== top.language && b.language !== 'Other') || island.buildings.find(b => b !== top);
-      const clampX = x => Math.max(70, Math.min(w - 70, x));
+      // Chips sit in the empty sky (one above the island, one beside the keel) with a leader line to the roof.
       const out = [];
-      if (top) { const p = buildingPoint(island, top, w, h, FIT); out.push({ ...p, lx: clampX(p.x), text: `Most stars: ${top.name}`, above: true }); }
-      if (other) { const p = buildingPoint(island, other, w, h, FIT); out.push({ ...p, y: p.y + other.height * Math.min(w, h) / (island.islandRadius * FIT), lx: clampX(p.x), text: `Roof colour = ${other.language}`, above: false }); }
+      if (top) out.push({ ...buildingPoint(island, top, w, h, FIT), cx: Math.max(8, w / 2 - 90), cy: 8, text: `Most stars: ${top.name}` });
+      if (other) out.push({ ...buildingPoint(island, other, w, h, FIT), cx: Math.max(8, Math.min(w * 0.58, w - 200)), cy: h * 0.74, text: `Roof colour = ${other.language}` });
       setLabels(out);
     };
     paint();
@@ -97,17 +96,22 @@ export function Compare({ dev }) {
 
         {/* Right: the same repos as an island, floating on the page's sky. */}
         <Box sx={{ position: 'absolute', inset: 0, clipPath: `inset(0 0 0 ${split}%)` }}>
-          <Box sx={{ position: 'absolute', top: 0, bottom: 0, left: { xs: '38%', md: '45%' }, right: 0 }}>
+          <Box sx={{ position: 'absolute', top: 0, bottom: 0, left: { xs: '28%', md: '45%' }, right: 0 }}>
             <Box ref={box} sx={{ position: 'absolute', inset: 0 }} />
+            <Box component="svg" aria-hidden sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}>
+              {labels.map(l => (
+                <g key={l.text}>
+                  <line x1={l.cx + Math.min(l.text.length * 6.6 + 18, 220) / 2} y1={l.cy + (l.cy < l.y ? 26 : 0)} x2={l.x} y2={l.y} stroke="rgba(255,255,255,.6)" strokeWidth="1" />
+                  <circle cx={l.x} cy={l.y} r="3" fill={t.text} />
+                </g>
+              ))}
+            </Box>
             {labels.map(l => (
-              <Box key={l.text} sx={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}>
-                <Box sx={{ position: 'absolute', left: l.x, top: l.above ? l.y - 34 : l.y + 4, width: '1px', height: 30, bgcolor: 'rgba(255,255,255,.5)' }} />
-                <Box className="num" sx={{
-                  position: 'absolute', left: l.lx, top: l.above ? l.y - 34 : l.y + 34, transform: l.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
-                  whiteSpace: 'nowrap', fontSize: 11, px: 1, py: 0.5, borderRadius: '6px', bgcolor: 'rgba(0,0,0,.85)', border: `1px solid ${t.lineStrong}`, color: t.text,
-                  maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis',
-                }}>{l.text}</Box>
-              </Box>
+              <Box key={l.text} className="num" sx={{
+                position: 'absolute', left: l.cx, top: l.cy, pointerEvents: 'none', whiteSpace: 'nowrap', fontSize: 11, lineHeight: '16px',
+                px: 1, py: 0.5, borderRadius: '6px', bgcolor: '#000', border: `1px solid ${t.lineStrong}`, color: t.text,
+                maxWidth: 'calc(100% - 16px)', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}>{l.text}</Box>
             ))}
           </Box>
           {dev && <Box className="num" sx={{ position: 'absolute', right: 16, bottom: 14, fontSize: 12, color: t.muted }}>@{dev.login}</Box>}
@@ -133,99 +137,39 @@ export function Compare({ dev }) {
   );
 }
 
-/* ---------- Islands already on the map ---------- */
-
-function IslandCard({ c, onFly }) {
-  const face = useRef(null);
-  const [n, setN] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    getUser(c.login).then(d => {
-      if (!alive || !face.current) return;
-      const island = toIsland(d);
-      const cv = island && window.renderIslandSnapshot(island, 420, 280, { sky: true, sign: false, fit: 3.2 });
-      if (!cv) return;
-      cv.style.width = '100%'; cv.style.height = '100%'; cv.style.display = 'block';
-      face.current.replaceChildren(cv);
-      setN(island.repoCount);
-    }).catch(() => {});
-    return () => { alive = false; };
-  }, [c.login]);
-  return (
-    <Box component="button" type="button" onClick={() => onFly(c.x, c.y)} aria-label={`Fly to ${c.login}'s island`} sx={{
-      all: 'unset', boxSizing: 'border-box', cursor: 'pointer', display: 'block', borderRadius: '14px', overflow: 'hidden',
-      border: `1px solid ${t.line}`, bgcolor: '#050506', scrollSnapAlign: 'start',
-      transition: 'transform .35s cubic-bezier(.2,.7,.2,1), border-color .35s',
-      '& .face canvas': { transition: 'transform .6s cubic-bezier(.2,.7,.2,1)' },
-      '&:hover, &:focus-visible': { transform: 'translateY(-6px)', borderColor: t.lineStrong },
-      '&:hover .face canvas, &:focus-visible .face canvas': { transform: 'scale(1.06)' },
-      '&:focus-visible': { outline: `2px solid ${t.text}`, outlineOffset: 2 },
-      '@media (prefers-reduced-motion: reduce)': { transition: 'none', '&:hover, &:focus-visible': { transform: 'none' }, '& .face canvas': { transition: 'none', transform: 'none !important' } },
-    }}>
-      <Box className="face" ref={face} sx={{ aspectRatio: '3 / 2', bgcolor: '#000', overflow: 'hidden' }} />
-      <Box sx={{ px: 2, py: 1.75, borderTop: `1px solid ${t.line}` }}>
-        <Box className="num" sx={{ fontSize: 14, color: t.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.login}</Box>
-        <Box sx={{ mt: 0.5, fontSize: 14, color: t.muted }}>{mostly(c.primaryLanguage, n ?? c.repoCount)}</Box>
-      </Box>
-    </Box>
-  );
-}
-
-export function Gallery({ people, total, onFly }) {
-  return (
-    <Box component="section" aria-labelledby="gal-title" sx={{ py: { xs: 9, md: 14 } }}>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', justifyContent: 'space-between', gap: 3 }}>
-        <Box>
-          <Box component="h2" id="gal-title" sx={h2}>Islands already on the map</Box>
-          <Box component="p" sx={lede}>
-            {total > 0 ? `${fmt(total)} developers so far. Here are six, picked at random. ` : 'Six developers, picked at random. '}
-            Pick one to fly there.
-          </Box>
-        </Box>
-      </Box>
-      <Box sx={{
-        mt: { xs: 4, md: 6 }, display: 'grid', gap: { xs: 1.5, md: 2.5 },
-        gridTemplateColumns: { sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' },
-        // Phones: one swipeable row instead of a tall stack.
-        '@media (max-width:599px)': {
-          gridAutoFlow: 'column', gridAutoColumns: '78%', overflowX: 'auto', scrollSnapType: 'x mandatory',
-          mx: -2, px: 2, pb: 1, scrollbarWidth: 'none', '&::-webkit-scrollbar': { display: 'none' },
-        },
-      }}>
-        {people.map(c => <IslandCard key={c.login} c={c} onFly={onFly} />)}
-      </Box>
-    </Box>
-  );
-}
-
 /* ---------- Postcards ---------- */
 
-function Postcard({ c, i }) {
+// Variants of the same island: sky on, a closer crop, and no sky.
+const VARIANTS = [{}, { fit: 2.5 }, { sky: false }];
+
+function Postcard({ dev, profile, i }) {
   const holder = useRef(null);
   useEffect(() => {
     let alive = true;
-    getUser(c.login).then(async d => {
-      const island = toIsland(d);
-      if (!island || !alive) return;
-      const cv = await renderPostcard(island, {}, island);
+    const island = toIsland(dev);
+    if (!island) return;
+    renderPostcard(island, profile, island, VARIANTS[i]).then(cv => {
       if (!alive || !holder.current) return;
       cv.style.width = '100%'; cv.style.height = '100%'; cv.style.display = 'block';
-      cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', `Postcard of ${c.login}'s island`);
       holder.current.replaceChildren(cv);
     }).catch(() => {});
     return () => { alive = false; };
-  }, [c.login]);
+  }, [dev, profile, i]);
   return <Box ref={holder} className={`card c${i}`} sx={{ bgcolor: t.surface }} />;
 }
 
-export function Postcards({ people }) {
+export function Postcards({ dev }) {
+  const [profile, setProfile] = useState(null);
+  useEffect(() => {
+    if (dev) getJSON('/api/profile/' + encodeURIComponent(dev.login)).then(setProfile).catch(() => setProfile({}));
+  }, [dev]);
   return (
     <Box component="section" aria-labelledby="pc-title" sx={{ py: { xs: 9, md: 14 }, textAlign: { md: 'center' } }}>
       <Box component="h2" id="pc-title" sx={h2}>Every island comes with a postcard</Box>
       <Box component="p" sx={{ ...lede, mx: { md: 'auto' } }}>
         Download a picture of your island with your top projects on it. Share yours on LinkedIn, X, or your README.
       </Box>
-      <Box tabIndex={0} aria-label="Example postcards" sx={{
+      <Box tabIndex={0} role="img" aria-label={dev ? `Three example postcards of ${dev.login}'s island` : 'Example postcards'} sx={{
         '--w': { xs: '230px', sm: '360px', md: '420px' }, '--rest': { xs: '46px', sm: '110px', md: '150px' }, '--open': { xs: '70px', sm: '200px', md: '330px' },
         position: 'relative', height: { xs: 230, sm: 330, md: 380 }, mt: { xs: 5, md: 8 }, outline: 'none',
         '& .card': {
@@ -241,7 +185,7 @@ export function Postcards({ people }) {
         '&:hover .c2, &:focus-visible .c2': { transform: 'translate(calc(-50% + var(--open)), -44%) rotate(5deg)' },
         '@media (prefers-reduced-motion: reduce)': { '& .card': { transition: 'none' } },
       }}>
-        {people.slice(0, 3).map((c, i) => <Postcard key={c.login} c={c} i={i} />)}
+        {dev && profile && VARIANTS.map((v, i) => <Postcard key={i} dev={dev} profile={profile} i={i} />)}
       </Box>
     </Box>
   );

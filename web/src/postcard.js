@@ -26,8 +26,8 @@ function loadImage(src) {
   });
 }
 
-// Draws the postcard. snapTarget: a login on the map (default) or an island object from buildIsland.
-export async function renderPostcard(island, profile, snapTarget = island.login) {
+// Draws the postcard. snapTarget: a login on the map (default) or an island object from buildIsland; snapOpts go to renderIslandSnapshot.
+export async function renderPostcard(island, profile, snapTarget = island.login, snapOpts) {
   const login = island.login;
   const p = profile || {};
   await Promise.all(['700 52px Satoshi', '400 24px Satoshi', '400 20px "Space Mono"'].map(f => document.fonts?.load(f)));
@@ -38,7 +38,7 @@ export async function renderPostcard(island, profile, snapTarget = island.login)
   g.fillStyle = t.surface; g.fillRect(0, 0, W, H);
 
   const picW = 680, picH = H - pad * 2;
-  const snap = window.renderIslandSnapshot?.(snapTarget, picW / 2, picH / 2);
+  const snap = window.renderIslandSnapshot?.(snapTarget, picW / 2, picH / 2, snapOpts);
   g.save();
   g.beginPath(); g.roundRect(pad, pad, picW, picH, 16); g.clip();
   if (snap) g.drawImage(snap, pad, pad, picW, picH);

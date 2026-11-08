@@ -7,7 +7,7 @@ import { animate, createTimeline, reduced, stagger, utils, Count } from '../moti
 import { getJSON } from '../lib.js';
 import { Brand } from './common.jsx';
 import FrontSky from './FrontSky.jsx';
-import { Compare, Gallery, Postcards, getUser, toIsland } from './FrontExamples.jsx';
+import { Compare, Postcards, getUser, toIsland } from './FrontExamples.jsx';
 
 const STEPS = [
   { when: 'Right away', title: 'Sign in with GitHub', body: 'We read your public repos and profile. Nothing private, and we never post anything for you.' },
@@ -20,10 +20,10 @@ const STEPS = [
 ];
 const HEADLINE = ['Every GitHub', 'account is', 'an island.'];
 const LOGIN_RE = /^[a-z\d](?:[a-z\d-]{0,38})$/i;
+const EXAMPLE = 'ronaksarda'; // the owner's account; no other person's island is shown unprompted
 const FIT = 3; // the island stands above its centre, so less than ~2.9 crops the top
 
 const wrap = { width: '100%', maxWidth: 1200, mx: 'auto', px: { xs: 2, sm: 4 } };
-const shuffle = a => { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; };
 
 function previewError(e) {
   if (e.status === 429) return 'Too many lookups from here. Wait a minute and try again.';
@@ -39,35 +39,25 @@ export default function FrontPage({ signedIn, stats, onExplore, onClose }) {
   const shownIsland = useRef(null);
   const riseToken = useRef(0);
 
-  const [pool, setPool] = useState([]);
-  const [compareDev, setCompareDev] = useState(null);
+  const [example, setExample] = useState(null); // the owner's own account, the only example shown
   const [value, setValue] = useState('');
-  const [hint, setHint] = useState(0);
-  const [focused, setFocused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [shown, setShown] = useState(null); // { login, onMap, x, y, projects, stars, lang, of }
 
   const go = (x, y) => { if (signedIn) onClose(); else onExplore(); window.flyTo(x, y, null); };
 
-  // Real people for the examples: random citizens with at least five repos.
+  // Privacy: the page only ever shows the owner's island until a visitor types a name themselves.
   useEffect(() => {
-    getJSON('/api/citizens').then(list => setPool(shuffle((Array.isArray(list) ? list : []).filter(c => c.repoCount >= 5)))).catch(() => {});
+    getUser(EXAMPLE)
+      .then(d => ({ ...d, onMap: true }))
+      .catch(() => getJSON('/api/preview/' + EXAMPLE).then(d => ({ ...d, onMap: false })))
+      .then(d => {
+        setExample(d);
+        showIsland(toIsland(d), { login: d.login, onMap: d.onMap, x: d.cx, y: d.cy });
+      })
+      .catch(() => {});
   }, []);
-  const hints = pool.slice(0, 3).map(c => c.login);
-  const gallery = pool.slice(2, 8);
-
-  useEffect(() => {
-    if (pool[1]) getUser(pool[1].login).then(setCompareDev).catch(() => {});
-    if (pool[0]) getUser(pool[0].login).then(d => showIsland(toIsland(d), { login: d.login, onMap: true, x: d.cx, y: d.cy })).catch(() => {});
-  }, [pool]);
-
-  // The placeholder cycles through three real names until the visitor starts typing.
-  useEffect(() => {
-    if (hints.length < 2 || focused || value || reduced()) return;
-    const id = setInterval(() => setHint(h => (h + 1) % hints.length), 2600);
-    return () => clearInterval(id);
-  }, [hints.length, focused, value]);
 
   // Draw an island into the hero. The old one sinks away, then the new one's buildings rise one by one.
   const paint = (island, born) => {
@@ -111,7 +101,7 @@ export default function FrontPage({ signedIn, stats, onExplore, onClose }) {
 
   const submit = async e => {
     e.preventDefault();
-    const login = (value.trim() || hints[hint] || '').replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?github\.com\//i, '').split(/[/?#]/)[0];
+    const login = value.trim().replace(/^@/, '').replace(/^(https?:\/\/)?(www\.)?github\.com\//i, '').split(/[/?#]/)[0];
     if (!login) { setError('Type a GitHub username first.'); return; }
     if (!LOGIN_RE.test(login)) { setError('That is not a valid GitHub username.'); return; }
     setBusy(true); setError('');
@@ -207,14 +197,13 @@ export default function FrontPage({ signedIn, stats, onExplore, onClose }) {
             </Box>
 
             <Box component="form" data-enter onSubmit={submit} noValidate sx={{ mt: { xs: 3.5, md: 5 }, maxWidth: 480 }}>
-              <Box component="label" htmlFor="gs-login" sx={{ display: 'block', fontSize: 14, color: t.muted, mb: 1 }}>Type any GitHub username</Box>
+              <Box component="label" htmlFor="gs-login" sx={{ display: 'block', fontSize: 14, color: t.muted, mb: 1 }}>GitHub username, yours or anyone's</Box>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <OutlinedInput id="gs-login" value={value} onChange={e => { setValue(e.target.value); setError(''); }}
-                  onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-                  placeholder={hints[hint] || 'username'} autoComplete="off" spellCheck={false}
+                  placeholder="Type your GitHub username" autoComplete="off" spellCheck={false}
                   inputProps={{ autoCapitalize: 'none', 'aria-describedby': 'gs-login-msg', 'aria-invalid': !!error }}
-                  startAdornment={<InputAdornment position="start" sx={{ mr: 0, '& p': { fontFamily: t.mono, fontSize: 14, color: t.faint } }}>github.com/</InputAdornment>}
-                  sx={{ flex: 1, minWidth: 0, height: 48, bgcolor: '#050506', '& input': { fontFamily: t.mono, fontSize: 15, pl: 0.25 } }} />
+                  startAdornment={<InputAdornment position="start" sx={{ mr: 0, display: { xs: 'none', sm: 'flex' }, '& p': { fontFamily: t.mono, fontSize: 14, color: t.faint } }}>github.com/</InputAdornment>}
+                  sx={{ flex: 1, minWidth: 0, height: 48, bgcolor: '#050506', '& input': { fontFamily: t.mono, fontSize: 15, pl: { xs: 0, sm: 0.25 } }, '& input::placeholder': { fontFamily: t.sans } }} />
                 <Button type="submit" variant="outlined" disabled={busy} sx={{ height: 48, px: 2.25, whiteSpace: 'nowrap', flexShrink: 0 }}>
                   {busy ? 'Building' : 'Show island'}
                 </Button>
@@ -226,14 +215,14 @@ export default function FrontPage({ signedIn, stats, onExplore, onClose }) {
           </Box>
 
           {/* The island stage. It drifts gently; the caption under it says whose island it is. */}
-          <Box sx={{ position: 'relative', mr: { md: -4 } }}>
+          <Box sx={{ position: 'relative', minWidth: 0, mr: { md: -4 } }}>
             <Box sx={{
               animation: 'gsDrift 6s ease-in-out infinite alternate',
               '@keyframes gsDrift': { from: { transform: 'translateY(0)' }, to: { transform: 'translateY(-12px)' } },
               '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
             }}>
               <Box ref={stage} role="img" aria-label={shown ? `${shown.login}'s island` : 'An island'} sx={{
-                height: { xs: 330, sm: 440, md: 'min(70svh, 660px)' }, position: 'relative', '& canvas': { display: 'block', mx: 'auto' },
+                height: { xs: 330, sm: 440, md: 'min(70svh, 660px)' }, position: 'relative', '& canvas': { position: 'absolute', left: 0, top: 0, display: 'block' },
               }} />
             </Box>
             <Box data-enter sx={{
@@ -257,9 +246,8 @@ export default function FrontPage({ signedIn, stats, onExplore, onClose }) {
         </Box>
 
         <Box sx={wrap}>
-          <Compare dev={compareDev} />
-          <Gallery people={gallery} total={stats?.totalUsers || 0} onFly={go} />
-          <Postcards people={gallery} />
+          <Compare dev={example} />
+          <Postcards dev={example} />
         </Box>
 
         {/* Timeline */}
