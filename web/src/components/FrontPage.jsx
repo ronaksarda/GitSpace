@@ -15,7 +15,7 @@ const STEPS = [
   { when: 'Any time', title: 'Visit anyone', body: 'Search a developer or a repo and fly there. Open a building to read the repo and run a health check on it.' },
   { when: 'Any time', title: 'Share yours', body: 'Download a postcard of your island, or copy a link that flies people straight to it.' },
   { when: 'When you ship', title: 'Your island grows', body: 'Refresh your island after you publish something. New repos show up as new buildings.' },
-  { when: 'Not built yet', title: 'Your first open-source PR', body: 'Beginner-friendly issues in the languages you already use, with a plain note on where to start.', soon: true },
+  { when: 'Whenever you are ready', title: 'Your first open-source PR', body: 'Press First PR on the map. You get beginner issues in the languages you already use. Take one, open a PR, and we count it once it is merged.' },
   { when: 'Not built yet', title: 'People like you', body: 'Developers from your city or college, or who build with the same tools.', soon: true },
 ];
 const HEADLINE = ['Every GitHub', 'account is', 'an island.'];
@@ -307,7 +307,7 @@ export default function FrontPage({ signedIn, stats, onExplore, onClose }) {
             {signedIn ? 'Your island is waiting.' : 'Make yours.'}
           </Box>
           <Box component="p" sx={{ m: 0, mt: 2, mb: 4, color: t.muted, fontSize: 17 }}>
-            {signedIn ? 'The last two steps are not built yet. Everything else works today.' : 'One click with GitHub, and it is on the map a few seconds later.'}
+            {signedIn ? 'Ready for your first open-source PR? Press First PR on the map.' : 'One click with GitHub, and it is on the map a few seconds later.'}
           </Box>
           <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
             {signedIn

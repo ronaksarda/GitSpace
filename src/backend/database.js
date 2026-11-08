@@ -707,7 +707,7 @@ setInterval(() => {
             }
         })
         .catch(err => console.error('[Cleanup] Session cleanup error:', err.message));
-}, 3600000);
+}, 3600000).unref(); // unref so a test process can exit
 
 // Islands keep clear of each other based on both sizes (spread = farthest building from centre).
 async function findFreeSpot(startX, startY, newSpread = 800) {
@@ -791,6 +791,7 @@ async function tryJobLock(name) {
 
 module.exports = {
     isSandbox: () => isSandbox,
+    raw: () => ({ pool, loadSandboxData, saveSandboxData }), // for missionsStore.js
     getRefreshQueue,
     markRefreshed,
     tryJobLock,

@@ -7,6 +7,7 @@ import { getJSON, islandByLogin, shipScreenPos, toast, world } from './lib.js';
 import FrontPage from './components/FrontPage.jsx';
 import DeveloperCard from './components/DeveloperCard.jsx';
 import RepoCard from './components/RepoCard.jsx';
+import Missions from './components/Missions.jsx';
 import { Citizens, ErrorDialog, GuestGate, ReviewDialog, Shortcuts } from './components/Dialogs.jsx';
 import { ArrivalCard, MainMenu, Onboarding, Readout, ShipRing, SpeedPopover, TopBar, readSpeed } from './components/World.jsx';
 
@@ -28,6 +29,8 @@ export default function App() {
   const [repo, setRepo] = useState(null);
   const [review, setReview] = useState(false);
   const [citizens, setCitizens] = useState(false);
+  const [missions, setMissions] = useState(false);
+  const [merged, setMerged] = useState(0); // their open-source PRs merged anywhere; changes the top bar button
   const [shortcuts, setShortcuts] = useState(false);
   const [gate, setGate] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState(null);
@@ -73,11 +76,15 @@ export default function App() {
     if (gs.ready && user && view === 'world' && store('localStorage', ONBOARD_KEY) !== '1') setOnboard(true);
   }, [gs.ready, user, view]);
 
-  const anyPanel = !!(dev || repo || review || citizens || shortcuts || gate || menuAnchor || speedAnchor || gs.error);
+  useEffect(() => {
+    if (user) getJSON('/api/missions/contributions').then(d => setMerged(d.merged)).catch(() => {});
+  }, [user?.login]);
+
+  const anyPanel = !!(dev || repo || review || citizens || missions || shortcuts || gate || menuAnchor || speedAnchor || gs.error);
   window.gsFrontPage = view !== 'world';
   window.gsModalOpen = anyPanel || view !== 'world';
 
-  const closeAll = () => { setDev(null); setRepo(null); setReview(false); setCitizens(false); setRing(false); };
+  const closeAll = () => { setDev(null); setRepo(null); setReview(false); setCitizens(false); setMissions(false); setRing(false); };
 
   const guestMayOpen = login => {
     if (!guest || !login) return true;
@@ -147,6 +154,7 @@ export default function App() {
     if (key === 'speed') return setSpeedAnchor(anchor);
     if (key === 'more') return setMenuAnchor(anchor);
     if (key === 'citizens') return setCitizens(true);
+    if (key === 'missions') { if (!user) { window.location.href = '/auth/github'; return; } closeAll(); return setMissions(true); }
     if (key === 'review') return setReview(true);
     if (key === 'shortcuts') return setShortcuts(true);
     if (key === 'screenshot') return setTimeout(() => window.captureScreenshot?.(), 250);
@@ -216,7 +224,7 @@ export default function App() {
       {view === 'world' && (
         <>
           <TopBar ref={search} user={user} guest={guest} onPick={m => window.flyTo(m.x, m.y, m)}
-            onMenu={el => setMenuAnchor(el.getBoundingClientRect())} />
+            onMenu={el => setMenuAnchor(el.getBoundingClientRect())} onMissions={() => onAction('missions')} merged={merged} />
           <Readout />
           <ArrivalCard />
           <ShipRing open={ring && inWorld} guest={!user} onClose={() => setRing(false)} onAction={onAction} />
@@ -232,6 +240,7 @@ export default function App() {
         onOpenOwner={login => { setRepo(null); openItem({ type: 'user', login }); }} />
       <ReviewDialog open={review} onClose={() => setReview(false)} onFind={findRepo} />
       <Citizens open={citizens} onClose={() => setCitizens(false)} onOpen={item => { setCitizens(false); openItem(item); }} />
+      <Missions open={missions} onClose={() => setMissions(false)} onMerged={setMerged} />
       <Shortcuts open={shortcuts} onClose={() => setShortcuts(false)} />
       <GuestGate open={gate} onClose={() => setGate(false)} peek={store('sessionStorage', PEEK_KEY)} />
       <ErrorDialog message={gs.error} />

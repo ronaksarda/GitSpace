@@ -17,12 +17,14 @@ const icons = {
   home: <path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z" />,
   more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
   menu: <path d="M4 7h16M4 12h16M4 17h16" />,
+  flag: <><path d="M5 21V4" /><path d="M5 4h11l-2 4 2 4H5" /></>,
 };
 
 /* ---------- Top bar ---------- */
 
-export const TopBar = forwardRef(function TopBar({ user, guest, onPick, onMenu }, searchRef) {
+export const TopBar = forwardRef(function TopBar({ user, guest, onPick, onMenu, onMissions, merged = 0 }, searchRef) {
   const narrow = useMediaQuery('(max-width:599px)');
+  const compact = useMediaQuery('(max-width:959px)'); // icon only, so the search box keeps its room
   return (
     <Box component="header" sx={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1100, height: 56, px: { xs: 1.5, sm: 2.5 },
@@ -32,11 +34,20 @@ export const TopBar = forwardRef(function TopBar({ user, guest, onPick, onMenu }
       <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
         <SearchBox ref={searchRef} onPick={onPick} />
       </Box>
-      <Box sx={{ flex: { sm: '0 0 180px' }, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
+      <Box sx={{ flex: { sm: '0 0 auto' }, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
+        {/* Before the first merge it invites; after, it shows the count and opens the dashboard. */}
+        <Tooltip title={merged ? `Your open source: ${merged} PRs merged. Find your next one.` : 'Your first open-source PR'}>
+          <Button variant="outlined" size="small" onClick={onMissions} aria-label="Open-source missions"
+            sx={{ whiteSpace: 'nowrap', borderColor: merged ? t.line : t.accent, color: t.text, minWidth: 0, gap: 0.75, px: compact ? 1 : 1.5 }}>
+            <Icon d={icons.flag} size={16} />
+            {merged ? <span className="num">{merged}</span> : !compact && 'First PR'}
+            {merged && !compact ? ' merged' : ''}
+          </Button>
+        </Tooltip>
         {user ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }} title={`Signed in as ${user.login}`}>
             <Avatar variant="rounded" src={avatarUrl(user.avatar_url || user.avatar, user.login)} alt="" sx={{ width: 26, height: 26, borderRadius: '6px' }} />
-            {!narrow && <Box sx={{ fontSize: 14, fontWeight: 500, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.login}</Box>}
+            {!compact && <Box sx={{ fontSize: 14, fontWeight: 500, maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.login}</Box>}
           </Box>
         ) : guest && <Button variant="contained" size="small" href="/auth/github" sx={{ whiteSpace: 'nowrap' }}>Sign in</Button>}
         <IconButton onClick={e => onMenu(e.currentTarget)} aria-label="Menu" aria-haspopup="menu"><Icon d={icons.menu} /></IconButton>
@@ -73,6 +84,7 @@ export function MainMenu({ anchor, onClose, onAction, user }) {
       ]}
       <Divider sx={{ my: 0.5 }} />
       {[
+        item('missions', 'Open-source missions'),
         item('citizens', 'Citizens'),
         item('review', 'Review a repo', 'R'),
         item('shortcuts', 'Keyboard shortcuts', 'H'),
