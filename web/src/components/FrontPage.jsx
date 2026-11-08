@@ -20,7 +20,10 @@ const STEPS = [
 ];
 const HEADLINE = ['Every GitHub', 'account is', 'an island.'];
 const LOGIN_RE = /^[a-z\d](?:[a-z\d-]{0,38})$/i;
-const EXAMPLE = 'ronaksarda'; // the owner's account; no other person's island is shown unprompted
+const EXAMPLE = 'ronaksarda'; // hero starting island: the owner's own account
+// Example cards show real people already on the map (chosen by the owner).
+const COMPARE_LOGIN = 'Aamod007';
+const CARD_LOGINS = ['saivvyy', 'Aamod007', 'adithya3010'];
 const FIT = 3; // the island stands above its centre, so less than ~2.9 crops the top
 
 const wrap = { width: '100%', maxWidth: 1200, mx: 'auto', px: { xs: 2, sm: 4 } };
@@ -39,7 +42,9 @@ export default function FrontPage({ signedIn, stats, onExplore, onClose }) {
   const shownIsland = useRef(null);
   const riseToken = useRef(0);
 
-  const [example, setExample] = useState(null); // the owner's own account, the only example shown
+  const [example, setExample] = useState(null); // hero island
+  const [compareDev, setCompareDev] = useState(null);
+  const [cardDevs, setCardDevs] = useState([]);
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -47,7 +52,11 @@ export default function FrontPage({ signedIn, stats, onExplore, onClose }) {
 
   const go = (x, y) => { if (signedIn) onClose(); else onExplore(); window.flyTo(x, y, null); };
 
-  // Privacy: the page only ever shows the owner's island until a visitor types a name themselves.
+  useEffect(() => {
+    getUser(COMPARE_LOGIN).then(setCompareDev).catch(() => {});
+    Promise.all(CARD_LOGINS.map(l => getUser(l).catch(() => null))).then(list => setCardDevs(list.filter(Boolean)));
+  }, []);
+
   useEffect(() => {
     getUser(EXAMPLE)
       .then(d => ({ ...d, onMap: true }))
@@ -246,8 +255,8 @@ export default function FrontPage({ signedIn, stats, onExplore, onClose }) {
         </Box>
 
         <Box sx={wrap}>
-          <Compare dev={example} />
-          <Postcards dev={example} />
+          <Compare dev={compareDev} />
+          <Postcards devs={cardDevs} />
         </Box>
 
         {/* Timeline */}

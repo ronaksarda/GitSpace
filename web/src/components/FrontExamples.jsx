@@ -139,8 +139,8 @@ export function Compare({ dev }) {
 
 /* ---------- Postcards ---------- */
 
-// Variants of the same island: sky on, a closer crop, and no sky.
-const VARIANTS = [{}, { fit: 2.5 }, { sky: false }];
+// One card per person; all with the sky.
+const VARIANTS = [{}, {}, {}];
 
 function Postcard({ dev, profile, i }) {
   const holder = useRef(null);
@@ -158,18 +158,19 @@ function Postcard({ dev, profile, i }) {
   return <Box ref={holder} className={`card c${i}`} sx={{ bgcolor: t.surface }} />;
 }
 
-export function Postcards({ dev }) {
-  const [profile, setProfile] = useState(null);
+export function Postcards({ devs }) {
+  const [profiles, setProfiles] = useState(null);
   useEffect(() => {
-    if (dev) getJSON('/api/profile/' + encodeURIComponent(dev.login)).then(setProfile).catch(() => setProfile({}));
-  }, [dev]);
+    if (!devs || !devs.length) return;
+    Promise.all(devs.map(d => getJSON('/api/profile/' + encodeURIComponent(d.login)).catch(() => ({})))).then(setProfiles);
+  }, [devs]);
   return (
     <Box component="section" aria-labelledby="pc-title" sx={{ py: { xs: 9, md: 14 }, textAlign: { md: 'center' } }}>
       <Box component="h2" id="pc-title" sx={h2}>Every island comes with a postcard</Box>
       <Box component="p" sx={{ ...lede, mx: { md: 'auto' } }}>
         Download a picture of your island with your top projects on it. Share yours on LinkedIn, X, or your README.
       </Box>
-      <Box tabIndex={0} role="img" aria-label={dev ? `Three example postcards of ${dev.login}'s island` : 'Example postcards'} sx={{
+      <Box tabIndex={0} role="img" aria-label={devs && devs.length ? `Example postcards: ${devs.map(d => d.login).join(', ')}` : 'Example postcards'} sx={{
         '--w': { xs: '230px', sm: '360px', md: '420px' }, '--rest': { xs: '46px', sm: '110px', md: '150px' }, '--open': { xs: '70px', sm: '200px', md: '330px' },
         position: 'relative', height: { xs: 230, sm: 330, md: 380 }, mt: { xs: 5, md: 8 }, outline: 'none',
         '& .card': {
@@ -185,7 +186,7 @@ export function Postcards({ dev }) {
         '&:hover .c2, &:focus-visible .c2': { transform: 'translate(calc(-50% + var(--open)), -44%) rotate(5deg)' },
         '@media (prefers-reduced-motion: reduce)': { '& .card': { transition: 'none' } },
       }}>
-        {dev && profile && VARIANTS.map((v, i) => <Postcard key={i} dev={dev} profile={profile} i={i} />)}
+        {profiles && devs.slice(0, 3).map((d, i) => <Postcard key={d.login} dev={d} profile={profiles[i] || {}} i={i} />)}
       </Box>
     </Box>
   );
