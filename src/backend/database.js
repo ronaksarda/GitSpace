@@ -245,6 +245,8 @@ async function initDb() {
         try {
             await client.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS description TEXT;`);
             await client.query(`ALTER TABLE repos ADD COLUMN IF NOT EXISTS updated_at VARCHAR(100);`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS refreshed_at TIMESTAMPTZ;`);
+            await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS repos_etag TEXT;`);
         } catch (e) {
             console.log('[DB] Note: Migration for repos table description/updated_at skipped or failed', e.message);
         }
@@ -306,7 +308,9 @@ async function deleteSession(sid) {
     await pool.query(`DELETE FROM sessions WHERE sid = $1`, [sid]);
 }
 
-async function saveUserLayout(login, cx, cy, avatar, repos) {
+// opts.touchLogin = false is used by the background refresh so it does not count as the person being active.
+async function saveUserLayout(login, cx, cy, avatar, repos, opts = {}) {
+    const touchLogin = opts.touchLogin !== false;
     if (isSandbox) {
         const langCounts = {};
         for (const r of repos) {
@@ -332,7 +336,9 @@ async function saveUserLayout(login, cx, cy, avatar, repos) {
             avatar,
             primary_language: primaryLang,
             first_seen: data.users[login] ? data.users[login].first_seen : now,
-            last_login: now
+            last_login: touchLogin || !data.users[login] ? now : data.users[login].last_login,
+            refreshed_at: data.users[login] ? data.users[login].refreshed_at : null,
+            repos_etag: data.users[login] ? data.users[login].repos_etag : null
         };
 
         data.repos = data.repos.filter(r => r.login !== login);
@@ -385,8 +391,8 @@ async function saveUserLayout(login, cx, cy, avatar, repos) {
                 cy = EXCLUDED.cy, 
                 avatar = EXCLUDED.avatar, 
                 primary_language = EXCLUDED.primary_language,
-                last_login = EXCLUDED.last_login
-        `, [login, cx, cy, avatar, primaryLang, now, now]);
+                last_login = CASE WHEN $8 THEN EXCLUDED.last_login ELSE users.last_login END
+        `, [login, cx, cy, avatar, primaryLang, now, now, touchLogin]);
 
         await client.query(`DELETE FROM repos WHERE login = $1`, [login]);
 
@@ -743,7 +749,51 @@ async function findFreeSpot(startX, startY, newSpread = 800) {
     return { x, y };
 }
 
+
+// ---------- Background refresh support (see refresh.js) ----------
+
+// Islands not refreshed within staleHours, oldest first (never-refreshed first).
+async function getRefreshQueue(limit, staleHours) {
+    const cutoff = Date.now() - staleHours * 3600 * 1000;
+    if (isSandbox) {
+        return Object.values(loadSandboxData().users)
+            .filter(u => !u.refreshed_at || u.refreshed_at < cutoff)
+            .sort((a, b) => (a.refreshed_at || 0) - (b.refreshed_at || 0))
+            .slice(0, limit)
+            .map(u => ({ login: u.login, cx: u.cx, cy: u.cy, avatar: u.avatar, repos_etag: u.repos_etag || null }));
+    }
+    const res = await pool.query(
+        `SELECT login, cx, cy, avatar, repos_etag FROM users
+         WHERE refreshed_at IS NULL OR refreshed_at < to_timestamp($1 / 1000.0)
+         ORDER BY refreshed_at ASC NULLS FIRST LIMIT $2`, [cutoff, limit]);
+    return res.rows;
+}
+
+async function markRefreshed(login, etag) {
+    if (isSandbox) {
+        const data = loadSandboxData();
+        if (data.users[login]) { data.users[login].refreshed_at = Date.now(); data.users[login].repos_etag = etag || null; saveSandboxData(data); }
+        return;
+    }
+    await pool.query(`UPDATE users SET refreshed_at = now(), repos_etag = $2 WHERE login = $1`, [login, etag || null]);
+}
+
+// Returns a release function if this process got the lock, or null if another one holds it.
+async function tryJobLock(name) {
+    if (isSandbox) return async () => {};
+    let key = 0;
+    for (const ch of name) key = (key * 31 + ch.charCodeAt(0)) | 0;
+    const client = await pool.connect();
+    const got = (await client.query(`SELECT pg_try_advisory_lock($1) AS ok`, [key])).rows[0].ok;
+    if (!got) { client.release(); return null; }
+    return async () => { try { await client.query(`SELECT pg_advisory_unlock($1)`, [key]); } finally { client.release(); } };
+}
+
 module.exports = {
+    isSandbox: () => isSandbox,
+    getRefreshQueue,
+    markRefreshed,
+    tryJobLock,
     initDb,
     createSession,
     getSessionById,

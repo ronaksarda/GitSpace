@@ -102,7 +102,8 @@ app.get('/u/:login', apiLimiter, async (req, res) => {
 app.use('/auth', authLimiter);
 app.use('/api', apiLimiter);
 app.use('/', require('./routes/auth')(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL));
-app.use('/', require('./routes/api')(db, heavyLimiter));
+const apiRouter = require('./routes/api')(db, heavyLimiter);
+app.use('/', apiRouter);
 
 // 404 fallback
 app.use((req, res) => {
@@ -131,6 +132,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 (async () => {
     await db.initDb();
+    require('./refresh').start(db, apiRouter); // daily island refresh, independent of sign-ins
     app.listen(PORT, () => {
         console.log(`GitSpace server running at ${APP_URL} (Port: ${PORT})`);
         if (!CLIENT_ID || !CLIENT_SECRET) {
