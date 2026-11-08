@@ -17,7 +17,7 @@ const issue = (id, over = {}) => ({
     repo_stars: 300, repo_pushed_at: new Date().toISOString(), comments: 0, created_at: new Date(Date.now() - 5 * 864e5).toISOString(), ...over,
 });
 
-let server, base, ghState, ghFails = false, ghBusy = false;
+let server, base, ghState, ghFails = false, ghBusy = false, freshKotlin = false;
 const call = (p, login, method = 'GET') => fetch(base + p, { method, headers: login ? { 'x-login': login } : {} }).then(async r => ({ status: r.status, body: await r.json() }));
 
 before(async () => {
@@ -35,11 +35,14 @@ before(async () => {
             repository_url: 'https://api.github.com/repos/kind/proj', pull_request: { merged_at: new Date().toISOString() } }] };
         if (p.includes('help wanted') && p.includes('repo:kind/proj')) return { items: [{ id: 501, number: 50, title: 'Next step', html_url: 'https://github.com/kind/proj/issues/50',
             repository_url: 'https://api.github.com/repos/kind/proj', body: 'y'.repeat(50), comments: 0, created_at: new Date(Date.now() - 3 * 864e5).toISOString() }] };
+        if (freshKotlin && p.includes('language:"Kotlin"')) return { items: [{ id: 701, number: 1, title: 'Fresh one', html_url: 'https://github.com/kt/app/issues/1',
+            repository_url: 'https://api.github.com/repos/kt/app', body: 'z'.repeat(50), comments: 0, created_at: new Date(Date.now() - 864e5).toISOString() }] };
+        if (p === '/repos/kt/app') return { stargazers_count: 300, pushed_at: new Date().toISOString(), created_at: '2020-01-01T00:00:00Z' };
         if (p === '/repos/kind/proj') return { stargazers_count: 5, language: 'Go', pushed_at: new Date().toISOString() };
         return ghState;
     };
     const app = express();
-    app.use(makeRouter({ db, store, gh, getLogin: async req => req.headers['x-login'] || null }));
+    app.use(makeRouter({ db, store, gh, getLogin: async req => req.headers['x-login'] || null, searchGap: async () => {} }));
     server = app.listen(0);
     base = 'http://127.0.0.1:' + server.address().port;
 });
@@ -109,13 +112,15 @@ test('start: GitHub says taken or closed, so it is refused and marked', async ()
     ghState = { state: 'open', assignees: [] };
 });
 
-test('after a merge: for-you leads with issues from that project, and they can be started', async () => {
+test('after a merge: for-you also offers issues from that project, kept out of everyone else\'s list, and startable', async () => {
     const data = db.raw().loadSandboxData();
     data.users.fay = { login: 'fay', cx: 0, cy: 0 };
     db.raw().saveSandboxData(data);
     const r = await call('/api/missions/for-you', 'fay');
     assert.deepEqual(r.body.fromProjects.map(i => [i.id, i.repo]), [[501, 'kind/proj']]);
     assert.ok(!r.body.issues.some(i => i.id === 501)); // not listed twice
+    assert.equal((await store.getIssue(501)).state, 'project');
+    assert.ok(!(await call('/api/missions/for-you', 'alice')).body.issues.some(i => i.id === 501)); // Go, but not alice's
     assert.equal((await call('/api/missions/contributions', 'fay')).body.merged, 1);
     assert.equal((await call('/api/missions/501/start', 'fay', 'POST')).status, 200);
     assert.ok(!(await call('/api/missions/for-you', 'fay')).body.fromProjects.some(i => i.id === 501));
@@ -139,6 +144,22 @@ test('nobody can drop someone else\'s mission, and a merged one cannot be droppe
     await store.updateMission(fays, { status: 'merged', pr_url: 'u', merged_at: new Date().toISOString() });
     assert.equal((await call(`/api/missions/${fays.id}/drop`, 'fay', 'POST')).status, 404);
     assert.equal((await call('/api/missions/mine', 'fay')).body[0].status, 'merged');
+});
+
+test('few issues for their languages: for-you fetches fresh ones right away; Refresh works once per 10 minutes', async () => {
+    const data = db.raw().loadSandboxData();
+    data.users.hal = { login: 'hal', cx: 0, cy: 0 };
+    data.repos.push({ login: 'hal', name: 'h', language: 'Kotlin' });
+    db.raw().saveSandboxData(data);
+    freshKotlin = true;
+    const r = await call('/api/missions/for-you', 'hal');
+    assert.deepEqual(r.body.languages, ['Kotlin']);
+    assert.deepEqual(r.body.issues.map(i => i.id), [701]);
+    assert.ok(r.body.refreshedAt);
+    const again = await call('/api/missions/refresh', 'hal', 'POST');
+    assert.equal(again.status, 429);
+    assert.match(again.body.error, /Try again in \d+ min/);
+    freshKotlin = false;
 });
 
 test('start: an issue assigned to the person themself is fine', async () => {

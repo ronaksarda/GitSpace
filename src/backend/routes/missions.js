@@ -1,6 +1,6 @@
 // /api/missions/*: issues picked for you, take one, drop one, see yours. Signed-in only.
 const express = require('express');
-const { rank, makeGh, contributions, projectIssues, LANGS, LIVE, MAX_PER_ISSUE } = require('../missions');
+const { rank, makeGh, contributions, projectIssues, refreshIssues, LANGS, LIVE, MAX_PER_ISSUE } = require('../missions');
 
 const ERRORS = {
     no_user: [403, 'Put your island on the map first, then come back.'],
@@ -30,7 +30,8 @@ function sessionLogin(db) {
     };
 }
 
-module.exports = function ({ db, store, getLogin, gh = makeGh() }) {
+// searchGap: pause between searches in a personal refresh (30 searches a minute per signed-in person).
+module.exports = function ({ db, store, getLogin, gh = makeGh(), searchGap = () => new Promise(ok => setTimeout(ok, 2100)) }) {
     const router = express.Router();
     const handle = fn => async (req, res) => {
         try {
@@ -60,33 +61,75 @@ module.exports = function ({ db, store, getLogin, gh = makeGh() }) {
         return remember(req, 'contribs', g => contributions(g, req.login, { viaGitSpace: via }));
     };
 
-    router.get('/api/missions/for-you', handle(async (req, res) => {
-        // Top three languages on their island that the refresh covers ("Other" or HTML would match nothing).
+    // Top three languages on their island that the refresh covers ("Other" or HTML would match nothing).
+    async function languagesOf(login) {
         const counts = {};
-        for (const r of await db.getRepos(req.login)) if (LANGS.includes(r.language)) counts[r.language] = (counts[r.language] || 0) + 1;
+        for (const r of await db.getRepos(login)) if (LANGS.includes(r.language)) counts[r.language] = (counts[r.language] || 0) + 1;
         const langs = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3);
-        if (!langs.length) langs.push('JavaScript', 'Python');
+        return langs.length ? langs : ['JavaScript', 'Python'];
+    }
 
+    // Fetch fresh beginner issues for one person's languages right now, on their own GitHub sign-in, instead of
+    // waiting for the 6-hourly refresh. At most once per 10 minutes each; two clicks share one run.
+    const refreshed = new Map(); // login -> { at, running }
+    function refreshFor(req, langs) {
+        const r = refreshed.get(req.login);
+        if (r?.running) return r.running;
+        if (r && Date.now() - r.at < 10 * 60e3) return null;
+        const userGh = req.ghToken ? makeGh(undefined, req.ghToken) : gh;
+        const running = refreshIssues(store, { gh: userGh, languages: langs, repoBudget: 60, wait: searchGap })
+            .finally(() => refreshed.set(req.login, { at: Date.now() }));
+        if (refreshed.size > 1000) refreshed.clear();
+        refreshed.set(req.login, { at: Date.now(), running });
+        return running;
+    }
+
+    async function forYou(req) {
+        const langs = await languagesOf(req.login);
         // Hide ones they hold or finished; expired and lost ones may show up again to be retaken.
         const taken = new Set((await store.missionsOf(req.login)).filter(m => LIVE.includes(m.status) || m.status === 'merged').map(m => String(m.issue_id)));
         const usable = i => !taken.has(String(i.id)) && !(i.gs_count >= MAX_PER_ISSUE); // gs_count is unknown for project issues
+        const perRepo = {}; // at most 2 per repo, so one busy repo cannot fill the list
+        const issues = rank((await store.openIssues(langs)).filter(usable), langs)
+            .filter(i => (perRepo[i.repo] = (perRepo[i.repo] || 0) + 1) <= 2).slice(0, 12);
 
-        // Projects that already merged their work come first. If GitHub is busy, just skip this part.
+        // Extra, shown folded below: issues in projects that merged their work before. Skipped if GitHub is busy.
         let fromProjects = [];
         try {
             const repos = (await contribsOf(req)).repos.map(r => r.repo);
             const found = await remember(req, 'projectIssues', g => projectIssues(g, repos));
-            await store.saveIssues(found); // so "I'm on it" and the hourly check work the same for these
-            fromProjects = found.filter(usable).slice(0, 6); // the 2-people-per-issue limit is still enforced on start
+            await store.saveIssues(found, 'project'); // startable, but kept out of everyone's shared list
+            const shown = new Set(issues.map(i => String(i.id)));
+            fromProjects = found.filter(i => usable(i) && !shown.has(String(i.id))).slice(0, 6);
         } catch (e) {
             if (!e.limited) throw e;
         }
+        return { languages: langs, issues, fromProjects, refreshedAt: refreshed.get(req.login)?.at || null };
+    }
 
-        const seen = new Set(fromProjects.map(i => String(i.id)));
-        const perRepo = {}; // at most 2 per repo, so one busy repo cannot fill the list
-        const issues = rank((await store.openIssues(langs)).filter(i => usable(i) && !seen.has(String(i.id))), langs)
-            .filter(i => (perRepo[i.repo] = (perRepo[i.repo] || 0) + 1) <= 2).slice(0, 12);
-        res.json({ languages: langs, fromProjects, issues });
+    router.get('/api/missions/for-you', handle(async (req, res) => {
+        let data = await forYou(req);
+        // Too few to pick from (new language, or the shared refresh has not covered it yet): fetch now, once.
+        if (data.issues.length < 6) {
+            const run = refreshFor(req, data.languages);
+            if (run) { await run.catch(e => { if (!e.limited) throw e; }); data = await forYou(req); }
+        }
+        res.json(data);
+    }));
+
+    router.post('/api/missions/refresh', handle(async (req, res) => {
+        const run = refreshFor(req, await languagesOf(req.login));
+        if (!run) {
+            const mins = Math.ceil((10 * 60e3 - (Date.now() - refreshed.get(req.login).at)) / 60e3);
+            return res.status(429).json({ error: `Just refreshed. Try again in ${mins} min.` });
+        }
+        try {
+            await run;
+        } catch (e) {
+            if (!e.limited) throw e;
+            return res.status(503).json({ error: 'GitHub is busy right now. Try again in a minute.' });
+        }
+        res.json(await forYou(req));
     }));
 
     router.get('/api/missions/mine', handle(async (req, res) => res.json(await store.missionsOf(req.login))));
@@ -102,7 +145,7 @@ module.exports = function ({ db, store, getLogin, gh = makeGh() }) {
 
     router.post('/api/missions/:id/start', handle(async (req, res) => {
         const issue = await store.getIssue(req.params.id);
-        if (!issue || issue.state !== 'open') return res.status(404).json({ error: ERRORS.no_issue[1] });
+        if (!issue || !['open', 'project'].includes(issue.state)) return res.status(404).json({ error: ERRORS.no_issue[1] });
         // Ask GitHub again: it may have been closed or taken since the last refresh. If GitHub does not answer, go ahead;
         // the hourly check catches a closed issue later.
         const live = await gh(`/repos/${issue.repo}/issues/${issue.number}`).catch(() => undefined);

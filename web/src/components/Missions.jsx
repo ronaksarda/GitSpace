@@ -110,6 +110,16 @@ export default function Missions({ open, onClose, onMerged }) {
   const [dash, setDash] = useState(null); // data, or { error }
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
+
+  const refresh = () => {
+    setRefreshing(true);
+    getJSON('/api/missions/refresh', { method: 'POST' })
+      .then(f => { setForYou(f); toast(f.issues.length ? 'Fresh issues loaded' : 'Nothing new right now'); })
+      .catch(e => toast(e.message))
+      .finally(() => setRefreshing(false));
+  };
 
   const load = () => {
     setError(false);
@@ -165,14 +175,20 @@ export default function Missions({ open, onClose, onMerged }) {
         Take one, comment on the issue that you are on it, then open a PR that says "Fixes #" and the issue number. We count it once it is merged.
         {live.length >= 2 && ' You have 2 missions going: finish or drop one to take another.'}
       </Muted>
-      {forYou.fromProjects.length > 0 && <>
-        {heading('From projects that merged your work')}
-        <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>{forYou.fromProjects.map(issueRow)}</Box>
-      </>}
-      {heading(`Beginner issues in ${forYou.languages.join(', ')}`)}
+      <Box sx={{ display: 'flex', alignItems: 'center', pr: 1 }}>
+        <Box sx={{ flex: 1 }}>{heading(`New beginner issues in ${forYou.languages.join(', ')}`)}</Box>
+        <Button size="small" disabled={refreshing} onClick={refresh} sx={{ color: t.muted, mt: 1 }}>{refreshing ? 'Looking…' : 'Refresh'}</Button>
+      </Box>
+      {forYou.refreshedAt && <Muted sx={{ px: 1.5, fontSize: 12 }}>Checked GitHub {timeAgo(new Date(forYou.refreshedAt).toISOString()).toLowerCase()}.</Muted>}
       {forYou.issues.length
         ? <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>{forYou.issues.map(issueRow)}</Box>
-        : <Muted sx={{ p: 1.5 }}>None open right now. The list refreshes every 6 hours.</Muted>}
+        : <Muted sx={{ p: 1.5 }}>None open right now. Press Refresh to look again, or check back later.</Muted>}
+      {forYou.fromProjects.length > 0 && <>
+        <Button size="small" onClick={() => setShowProjects(v => !v)} sx={{ color: t.muted, mt: 1, ml: 0.5 }}>
+          {showProjects ? 'Hide' : 'Show'} issues in projects you contributed to before ({forYou.fromProjects.length})
+        </Button>
+        {showProjects && <Box component="ul" sx={{ listStyle: 'none', m: 0, p: 0 }}>{forYou.fromProjects.map(issueRow)}</Box>}
+      </>}
     </>;
   } else {
     body = !live.length ? <Muted sx={{ p: 1.5 }}>Nothing in progress. Pick one from For you.</Muted> : (

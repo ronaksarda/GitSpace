@@ -33,20 +33,24 @@ async function ensureSchema() {
         CREATE INDEX IF NOT EXISTS missions_live ON missions (checked_at) WHERE status IN ('active', 'pr_open');`);
 }
 
-// Seen again by the refresh: open, with fresh numbers.
-async function saveIssues(list) {
+// state 'open': seen by the beginner search, goes in everyone's shared list (fresh numbers, reopened).
+// state 'project': one person's "projects you contributed to" extra; startable but never shown to others,
+// and never overwrites a row the beginner search already owns.
+async function saveIssues(list, state = 'open') {
     if (sandbox()) {
         const f = file();
-        for (const i of list) f.data.issues[i.id] = { ...i, fetched_at: iso(), state: 'open' };
+        for (const i of list) if (state === 'open' || !f.data.issues[i.id]) f.data.issues[i.id] = { ...i, fetched_at: iso(), state };
         f.save();
         return list.length;
     }
+    const onConflict = state === 'open'
+        ? `DO UPDATE SET repo=$2, title=$4, url=$5, language=$6, repo_stars=$7, repo_pushed_at=$8, comments=$9, fetched_at=now(), state='open'`
+        : 'DO NOTHING';
     for (const i of list) {
         await query(
-            `INSERT INTO issues (id, repo, number, title, url, language, repo_stars, repo_pushed_at, comments, created_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-             ON CONFLICT (id) DO UPDATE SET repo=$2, title=$4, url=$5, language=$6, repo_stars=$7, repo_pushed_at=$8, comments=$9, fetched_at=now(), state='open'`,
-            [i.id, i.repo, i.number, i.title, i.url, i.language, i.repo_stars, i.repo_pushed_at, i.comments, i.created_at]);
+            `INSERT INTO issues (id, repo, number, title, url, language, repo_stars, repo_pushed_at, comments, created_at, state)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (id) ${onConflict}`,
+            [i.id, i.repo, i.number, i.title, i.url, i.language, i.repo_stars, i.repo_pushed_at, i.comments, i.created_at, state]);
     }
     return list.length;
 }
