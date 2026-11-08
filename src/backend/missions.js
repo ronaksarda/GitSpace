@@ -18,17 +18,20 @@ function makeGh(fetchFn = (...a) => fetch(...a), token = process.env.GITHUB_TOKE
     if (token) headers.Authorization = `Bearer ${token}`;
     return async function gh(path) {
         const r = await fetchFn('https://api.github.com' + path, { headers });
-        // A 403 also means "repo blocked"; it is a rate limit only when GitHub says so.
-        if (r.status === 429 || (r.status === 403 && (r.headers.get('retry-after') || r.headers.get('x-ratelimit-remaining') === '0'))) {
-            throw Object.assign(new Error('GitHub rate limit'), { limited: true });
+        // 429 and 403 mean "slow down" (secondary limits often send no headers), so callers stop and retry later
+        // rather than conclude something is gone. A 403 without rate-limit headers may also be one blocked repo:
+        // `forbidden` lets a caller skip just that repo.
+        if (r.status === 429 || r.status === 403) {
+            const forbidden = r.status === 403 && !r.headers.get('retry-after') && r.headers.get('x-ratelimit-remaining') !== '0';
+            throw Object.assign(new Error(`GitHub ${r.status} for ${path}`), { limited: true, forbidden });
         }
-        if ([403, 404, 410, 451].includes(r.status)) return null; // blocked, deleted or gone: treat as missing
+        if ([404, 410, 451].includes(r.status)) return null; // deleted or gone
         if (!r.ok) throw new Error(`GitHub ${r.status} for ${path}`);
         return r.json();
     };
 }
 
-const search = q => `/search/issues?per_page=100&sort=created&order=desc&q=${encodeURIComponent(q)}`;
+const search = (q, perPage = 100) => `/search/issues?per_page=${perPage}&sort=created&order=desc&q=${encodeURIComponent(q)}`;
 // One query covers all three label spellings: a comma inside label: means OR.
 const issueQuery = lang => `is:issue is:open no:assignee archived:false language:"${lang}" label:"good first issue","good-first-issue",beginner`;
 const repoOf = item => (item.repository_url || '').split('/repos/')[1] || '';
@@ -82,7 +85,8 @@ async function refreshIssues(store, { gh, languages = LANGS, repoBudget = proces
                 if (!issue) continue;
                 if (!repos.has(issue.repo)) {
                     if (repoBudget-- <= 0) continue; // unchecked repos are not saved; their old rows go stale and hide themselves
-                    repos.set(issue.repo, await gh(`/repos/${issue.repo}`));
+                    // One blocked repo (403 without rate-limit headers) is skipped, not a reason to stop the run.
+                    repos.set(issue.repo, await gh(`/repos/${issue.repo}`).catch(e => { if (e.forbidden) return null; throw e; }));
                 }
                 const repo = repos.get(issue.repo);
                 if (keepRepo(repo, now)) keep.push({ ...issue, language, repo_stars: repo.stargazers_count, repo_pushed_at: repo.pushed_at });
@@ -103,9 +107,9 @@ async function checkMissions(store, { gh, batch = 200, now = Date.now(), wait = 
     let calls = 0;
     const call = async path => { if (calls++) await wait(gap()); return gh(path); };
     const prs = async (m, state) => (await call(search(`type:pr author:${m.login} repo:${m.repo} ${state}`)))?.items || [];
-    try {
-        for (const m of await store.missionsToCheck(batch)) {
-            const save = patch => store.updateMission(m, patch);
+    for (const m of await store.missionsToCheck(batch)) {
+        const save = patch => store.updateMission(m, patch);
+        try {
             // Merged before they took the mission does not count: no claiming old work.
             const merged = matchPr((await prs(m, 'is:merged')).filter(it => ms(it.pull_request?.merged_at) >= ms(m.started_at)), m);
             if (merged) {
@@ -134,10 +138,14 @@ async function checkMissions(store, { gh, batch = 200, now = Date.now(), wait = 
             } else {
                 await save({ status: 'active' }); // also where a PR closed without merging lands
             }
+        } catch (e) {
+            // GitHub busy: stop, nothing about this mission is decided. Anything else is about this one mission
+            // (say a deleted repo makes the search fail): note it, mark it checked so it goes to the back, carry on.
+            if (e.limited) { out.limited = true; break; }
+            console.warn('[Missions] check failed for', m.login, m.repo, m.number, e.message);
+            out.failed = (out.failed || 0) + 1;
+            await save({ status: m.status, pr_url: m.pr_url || null, merged_at: null });
         }
-    } catch (e) {
-        if (!e.limited) throw e;
-        out.limited = true;
     }
     return out;
 }
@@ -146,9 +154,11 @@ async function checkMissions(store, { gh, batch = 200, now = Date.now(), wait = 
 // for the latest `detail` PRs (one call each), merges per month for the last 12 months, and which came via GitSpace.
 async function contributions(gh, login, { viaGitSpace = [], detail = 20, now = Date.now() } = {}) {
     const merged = await gh(search(`type:pr author:${login} -user:${login} is:merged`));
-    const open = await gh(search(`type:pr author:${login} -user:${login} is:open`).replace('per_page=100', 'per_page=1'));
+    const open = await gh(search(`type:pr author:${login} -user:${login} is:open`, 1));
+    // A search never "does not exist"; an empty answer here means GitHub failed, so do not show (or cache) zero.
+    if (!merged || !open) throw Object.assign(new Error('GitHub search gave no answer'), { limited: true });
     const via = new Set(viaGitSpace);
-    const prs = (merged?.items || []).map(it => ({
+    const prs = (merged.items || []).map(it => ({
         repo: repoOf(it), number: it.number, title: it.title, url: it.html_url,
         merged_at: it.pull_request?.merged_at || it.closed_at, via_gitspace: via.has(it.html_url), commits: null,
     })).filter(p => p.repo).sort((a, b) => ms(b.merged_at) - ms(a.merged_at));
@@ -157,12 +167,13 @@ async function contributions(gh, login, { viaGitSpace = [], detail = 20, now = D
         for (const p of prs.slice(0, detail)) { p.commits = (await gh(`/repos/${p.repo}/pulls/${p.number}`))?.commits ?? null; counted++; }
     } catch (e) { if (!e.limited) throw e; }
 
-    const repos = {};
+    const byRepo = {};
     for (const p of prs) {
-        const r = repos[p.repo] ||= { repo: p.repo, prs: [], commits: 0 };
+        const r = byRepo[p.repo] ||= { repo: p.repo, prs: [], commits: 0 };
         r.prs.push(p);
         r.commits += p.commits || 0;
     }
+    const repos = Object.values(byRepo);
     const months = Array.from({ length: 12 }, (_, i) => {
         const d = new Date(now);
         d.setUTCDate(1);
@@ -172,14 +183,14 @@ async function contributions(gh, login, { viaGitSpace = [], detail = 20, now = D
     for (const p of prs) { const m = months.find(x => x.month === String(p.merged_at).slice(0, 7)); if (m) m.merged++; }
 
     return {
-        merged: merged?.total_count ?? prs.length, // total can exceed the 100 we list
-        open: open?.total_count ?? 0,
-        projects: Object.keys(repos).length,
-        commits: prs.reduce((s, p) => s + (p.commits || 0), 0),
+        merged: merged.total_count ?? prs.length, // total can exceed the 100 we list
+        open: open.total_count ?? 0,
+        projects: repos.length,
+        commits: repos.reduce((s, r) => s + r.commits, 0),
         commitsCounted: counted, // commits are summed over this many latest PRs
         viaGitSpace: prs.filter(p => p.via_gitspace).length,
         months,
-        repos: Object.values(repos).sort((a, b) => b.prs.length - a.prs.length || ms(b.prs[0].merged_at) - ms(a.prs[0].merged_at)),
+        repos: repos.sort((a, b) => b.prs.length - a.prs.length || ms(b.prs[0].merged_at) - ms(a.prs[0].merged_at)),
     };
 }
 
@@ -209,8 +220,8 @@ function start(db, store) {
     if (db.isSandbox() && process.env.MISSIONS_IN_SANDBOX !== 'true') return;
     const gh = makeGh();
     const job = (name, fn) => async () => {
-        const release = await db.tryJobLock(name).catch(() => null);
-        if (!release) return; // another instance is running it
+        const release = await db.tryJobLock(name).catch(e => { console.warn(`[Missions] ${name}: lock failed:`, e.message); return null; });
+        if (!release) return; // another instance is running it, or the lock failed (logged)
         try { console.log(`[Missions] ${name}`, JSON.stringify(await fn(store, { gh }))); }
         catch (e) { console.warn(`[Missions] ${name} failed:`, e.message); }
         finally { await release(); }

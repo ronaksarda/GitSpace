@@ -184,6 +184,39 @@ test('checkMissions: being assigned yourself is fine; 45 days with no PR expires
     assert.deepEqual(statuses(old), ['expired']);
 });
 
+test('checkMissions: one broken mission is skipped (and sent to the back), the rest are still checked', async () => {
+    const store = fakeStore([live({ id: 1, repo: 'deleted/repo' }), live({ id: 2 })]);
+    const gh = async p => { if (decodeURIComponent(p).includes('deleted/repo')) throw new Error('GitHub 422'); return github({ merged: [pr()] })(p); };
+    const out = await m.checkMissions(store, { gh, now: NOW, wait: noWait });
+    assert.equal(out.failed, 1);
+    assert.equal(out.merged, 1);
+    assert.deepEqual(store.calls.updates.map(([id, p]) => [id, p.status]), [[1, 'active'], [2, 'merged']]);
+});
+
+test('checkMissions: a 403 from GitHub never marks a mission lost', async () => {
+    const store = fakeStore([live()]);
+    const gh = async p => { if (!p.startsWith('/search')) throw Object.assign(new Error('403'), { limited: true, forbidden: true }); return { items: [] }; };
+    const out = await m.checkMissions(store, { gh, now: NOW, wait: noWait });
+    assert.equal(out.limited, true);
+    assert.equal(store.calls.updates.length, 0);
+});
+
+test('refreshIssues: one blocked repo is skipped, the run goes on', async () => {
+    const store = fakeStore();
+    const gh = async path => {
+        if (path.startsWith('/search')) return { items: [item({ id: 2, number: 8, repository_url: 'https://api.github.com/repos/o/blocked' }), item({ id: 1 })] };
+        if (path.endsWith('/blocked')) throw Object.assign(new Error('403'), { limited: true, forbidden: true });
+        return repo();
+    };
+    const out = await m.refreshIssues(store, { gh, languages: ['Go'], now: NOW, wait: noWait });
+    assert.equal(out.limited, false);
+    assert.deepEqual(store.calls.saved.map(i => i.id), [1]);
+});
+
+test('contributions: a failed search is an error, never a dashboard of zeros', async () => {
+    await assert.rejects(m.contributions(async () => null, 'alice', { now: NOW }), e => e.limited);
+});
+
 test('checkMissions: a rate limit stops without touching the mission', async () => {
     const store = fakeStore([live()]);
     const out = await m.checkMissions(store, { gh: async () => { throw limited(); }, now: NOW, wait: noWait });
@@ -240,9 +273,10 @@ test('projectIssues: one search over their projects, help wanted and small repos
 test('makeGh: missing or blocked gives null; real rate limits throw limited; other failures throw', async () => {
     const reply = (status, h = {}) => ({ status, ok: status < 300, headers: { get: k => h[k] ?? null }, json: async () => ({ ok: 1 }) });
     const gh = (...a) => m.makeGh(async () => reply(...a), 't')('/x');
-    for (const s of [404, 410, 451, 403]) assert.equal(await gh(s), null, String(s));
-    await assert.rejects(gh(403, { 'retry-after': '30' }), e => e.limited);
-    await assert.rejects(gh(403, { 'x-ratelimit-remaining': '0' }), e => e.limited);
+    for (const s of [404, 410, 451]) assert.equal(await gh(s), null, String(s));
+    await assert.rejects(gh(403, { 'retry-after': '30' }), e => e.limited && !e.forbidden);
+    await assert.rejects(gh(403, { 'x-ratelimit-remaining': '0' }), e => e.limited && !e.forbidden);
+    await assert.rejects(gh(403), e => e.limited && e.forbidden); // secondary limit or one blocked repo: never "gone"
     await assert.rejects(gh(429), e => e.limited);
     await assert.rejects(gh(500), /GitHub 500/);
     assert.deepEqual(await gh(200), { ok: 1 });

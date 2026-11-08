@@ -17,7 +17,7 @@ const issue = (id, over = {}) => ({
     repo_stars: 300, repo_pushed_at: new Date().toISOString(), comments: 0, created_at: new Date(Date.now() - 5 * 864e5).toISOString(), ...over,
 });
 
-let server, base, ghState, ghFails = false;
+let server, base, ghState, ghFails = false, ghBusy = false;
 const call = (p, login, method = 'GET') => fetch(base + p, { method, headers: login ? { 'x-login': login } : {} }).then(async r => ({ status: r.status, body: await r.json() }));
 
 before(async () => {
@@ -29,6 +29,7 @@ before(async () => {
     ghState = { state: 'open', assignees: [] };
     const gh = async path => {
         if (ghFails) throw new Error('network');
+        if (ghBusy && path.startsWith('/search')) throw Object.assign(new Error('limited'), { limited: true });
         const p = decodeURIComponent(path);
         if (p.includes('author:fay') && p.includes('is:merged')) return { total_count: 1, items: [{ number: 3, title: 'Old fix', html_url: 'https://github.com/fay/proj/pull/3',
             repository_url: 'https://api.github.com/repos/kind/proj', pull_request: { merged_at: new Date().toISOString() } }] };
@@ -120,6 +121,26 @@ test('after a merge: for-you leads with issues from that project, and they can b
     assert.ok(!(await call('/api/missions/for-you', 'fay')).body.fromProjects.some(i => i.id === 501));
 });
 
+test('GitHub busy: contributions says so (503), for-you still works without the project section', async () => {
+    ghBusy = true;
+    const c = await call('/api/missions/contributions', 'gus'); // nobody cached yet
+    assert.equal(c.status, 503);
+    assert.match(c.body.error, /busy/);
+    const f = await call('/api/missions/for-you', 'alice');
+    assert.equal(f.status, 200);
+    assert.deepEqual(f.body.fromProjects, []);
+    ghBusy = false;
+});
+
+test('nobody can drop someone else\'s mission, and a merged one cannot be dropped', async () => {
+    const fays = (await call('/api/missions/mine', 'fay')).body[0];
+    assert.equal((await call(`/api/missions/${fays.id}/drop`, 'alice', 'POST')).status, 404);
+    assert.equal((await call('/api/missions/mine', 'fay')).body[0].status, 'active');
+    await store.updateMission(fays, { status: 'merged', pr_url: 'u', merged_at: new Date().toISOString() });
+    assert.equal((await call(`/api/missions/${fays.id}/drop`, 'fay', 'POST')).status, 404);
+    assert.equal((await call('/api/missions/mine', 'fay')).body[0].status, 'merged');
+});
+
 test('start: an issue assigned to the person themself is fine', async () => {
     await store.saveIssues([issue(7)]);
     const data = db.raw().loadSandboxData();
@@ -149,8 +170,9 @@ test('start: bad id, unknown issue, and someone with no island', async () => {
 
 test('merged missions are counted and cannot be started again', async () => {
     const m = (await call('/api/missions/mine', 'alice')).body.find(x => x.issue_id === 3);
+    const before = await store.countMerged();
     await store.updateMission(m, { status: 'merged', pr_url: 'https://github.com/o/r3/pull/1', merged_at: new Date().toISOString() });
-    assert.equal(await store.countMerged(), 1);
+    assert.equal(await store.countMerged(), before + 1);
     assert.equal((await call('/api/missions/3/start', 'alice', 'POST')).status, 409);
     assert.ok(!(await call('/api/missions/for-you', 'alice')).body.issues.some(i => i.id === 3));
 });

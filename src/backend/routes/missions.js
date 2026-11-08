@@ -108,8 +108,9 @@ module.exports = function ({ db, store, getLogin, gh = makeGh() }) {
         const live = await gh(`/repos/${issue.repo}/issues/${issue.number}`).catch(() => undefined);
         const others = (live?.assignees || []).filter(a => a.login.toLowerCase() !== req.login.toLowerCase()); // assigned to them is fine
         if (live !== undefined && (!live || live.state !== 'open' || others.length)) {
-            await store.setIssueState(issue.id, live?.state === 'open' ? 'taken' : 'closed');
-            return res.status(409).json({ error: live?.state === 'open' ? 'Someone just took this issue. Pick another.' : 'This issue was closed. Pick another.' });
+            const taken = live?.state === 'open';
+            await store.setIssueState(issue.id, taken ? 'taken' : 'closed');
+            return res.status(409).json({ error: taken ? 'Someone just took this issue. Pick another.' : 'This issue was closed. Pick another.' });
         }
         const r = await store.startMission(req.login, issue.id);
         if (r.error) return res.status(ERRORS[r.error][0]).json({ error: ERRORS[r.error][1] });
