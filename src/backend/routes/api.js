@@ -492,6 +492,44 @@ module.exports = function (db, heavyLimiter) {
         }
     });
 
+    // Island preview for any GitHub username, for the front page. Built from public repos, never saved.
+    router.get('/api/preview/:login', heavyLimiter || ((req, res, next) => next()), async (req, res) => {
+        try {
+            const login = String(req.params.login || '');
+            if (!/^[a-z\d](?:[a-z\d-]{0,38})$/i.test(login)) return res.status(400).json({ error: 'That is not a valid GitHub username.' });
+            const cacheKey = 'preview:' + login.toLowerCase();
+            const cached = getCached(cacheKey, 60 * 60 * 1000);
+            if (cached) return res.json(cached);
+
+            const session = await getSession(req);
+            const token = session?.token;
+            const uRes = await githubFetch(`https://api.github.com/users/${encodeURIComponent(login)}`, token);
+            if (uRes.status === 404) return res.status(404).json({ error: 'No GitHub account with that name.' });
+            if (uRes.status === 403 || uRes.status === 429) return res.status(503).json({ error: 'GitHub is busy right now. Try again in a minute.' });
+            if (!uRes.ok) return res.status(502).json({ error: 'Could not reach GitHub.' });
+            const u = await uRes.json();
+
+            const rRes = await githubFetch(`https://api.github.com/users/${encodeURIComponent(login)}/repos?per_page=100&sort=updated&type=owner`, token);
+            if (rRes.status === 403 || rRes.status === 429) return res.status(503).json({ error: 'GitHub is busy right now. Try again in a minute.' });
+            const repos = rRes.ok ? (await rRes.json()).filter(r => !r.fork) : [];
+            const picked = pickIslandRepos(repos, []);
+            const layout = await generateLayoutEngine(picked, 0, 0);
+
+            const langCount = {};
+            for (const r of picked) if (r.language) langCount[r.language] = (langCount[r.language] || 0) + 1;
+            const primaryLanguage = Object.entries(langCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Other';
+            const data = {
+                login: u.login, name: u.name, avatar: u.avatar_url, createdAt: u.created_at, publicRepos: u.public_repos,
+                followers: u.followers, primaryLanguage, cx: 0, cy: 0, repos: layout.repos, onMap: !!(await db.getUser(u.login)),
+            };
+            setCache(cacheKey, data);
+            res.json(data);
+        } catch (err) {
+            console.error('[API] /api/preview error:', err.message);
+            res.status(500).json({ error: 'Could not build that island.' });
+        }
+    });
+
     // Public GitHub profile + profile README for the island card. Only for people on the map, cached 1 hour.
     router.get('/api/profile/:login', heavyLimiter || ((req, res, next) => next()), async (req, res) => {
         try {

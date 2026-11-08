@@ -57,3 +57,14 @@ export const LangDot = ({ lang }) => (
 );
 
 export const Muted = ({ children, sx }) => <Box component="p" sx={{ m: 0, color: t.muted, fontSize: 14, lineHeight: 1.55, ...sx }}>{children}</Box>;
+
+// Brand: the owner's planet logo next to the wordmark. full = the wide ringed-planet art, otherwise the square mark.
+export function Brand({ full = false, size = 28, fontSize = 16, sx }) {
+  return (
+    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1, fontWeight: 700, fontSize, letterSpacing: '-0.01em', ...sx }}>
+      <Box component="img" src={full ? '/logo.svg' : '/logo-mark.svg'} alt="" aria-hidden
+        sx={{ height: size, width: full ? 'auto' : size, display: 'block' }} />
+      GitSpace
+    </Box>
+  );
+}

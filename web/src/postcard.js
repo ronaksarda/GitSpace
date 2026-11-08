@@ -26,7 +26,8 @@ function loadImage(src) {
   });
 }
 
-export async function downloadPostcard(island, profile) {
+// Draws the postcard. snapTarget: a login on the map (default) or an island object from buildIsland.
+export async function renderPostcard(island, profile, snapTarget = island.login) {
   const login = island.login;
   const p = profile || {};
   await Promise.all(['700 52px Satoshi', '400 24px Satoshi', '400 20px "Space Mono"'].map(f => document.fonts?.load(f)));
@@ -37,7 +38,7 @@ export async function downloadPostcard(island, profile) {
   g.fillStyle = t.surface; g.fillRect(0, 0, W, H);
 
   const picW = 680, picH = H - pad * 2;
-  const snap = window.renderIslandSnapshot?.(login, picW / 2, picH / 2);
+  const snap = window.renderIslandSnapshot?.(snapTarget, picW / 2, picH / 2);
   g.save();
   g.beginPath(); g.roundRect(pad, pad, picW, picH, 16); g.clip();
   if (snap) g.drawImage(snap, pad, pad, picW, picH);
@@ -68,7 +69,12 @@ export async function downloadPostcard(island, profile) {
 
   g.fillStyle = t.faint; g.font = '400 18px "Space Mono"';
   g.fillText(`${window.location.host}/?fly=${login}`, x, H - pad - 8);
+  return c;
+}
 
+export async function downloadPostcard(island, profile) {
+  const login = island.login;
+  const c = await renderPostcard(island, profile);
   const blob = await new Promise((res, rej) => c.toBlob(b => (b ? res(b) : rej(new Error('empty'))), 'image/png'));
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);

@@ -2,11 +2,11 @@
 import { forwardRef, useEffect, useLayoutEffect, useRef } from 'react';
 import { cloneElement, createElement } from 'react';
 import { useForkRef } from '@mui/material/utils';
-import { animate, spring, stagger, createTimeline } from 'animejs';
+import { animate, spring, stagger, createTimeline, utils } from 'animejs';
 import { fmt } from './lib.js';
 
 export const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-export { animate, stagger, createTimeline };
+export { animate, stagger, createTimeline, utils };
 
 const openSpring = () => spring({ bounce: 0.18, duration: 360 });
 

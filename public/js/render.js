@@ -4,9 +4,9 @@ const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-mo
 const COZY = {
   skyTop: '#1E1B3A', skyMid: '#35295A', skyLow: '#5E4475', glow: '244,169,122',
   star: '#FFF1D6', cream: '#FFF4E6', ink: '#2B2340',
-  grass: '#9BD38A', grassLight: '#C4EBA4', dirt: '#C98E6A',
-  rock: ['#6E5585', '#8A6F9E', '#A58BB8'],
-  leaf: ['#4E9A6B', '#6DBB7E'], trunk: '#8B5E4A',
+  grass: '#5F9460', grassLight: '#79AE72', dirt: '#8A5F4B', // night-tuned
+  rock: ['#3B3550', '#4C4566', '#5E567A'],
+  leaf: ['#2F5E43', '#3F7553'], trunk: '#5E4034',
   window: '#FFD27A', shadow: 'rgba(43,35,64,0.28)', coral: '#F2765A', glass: '#7FC8E8',
 };
 
@@ -31,33 +31,76 @@ function seededRand(seed) {
 }
 function easeOutBack(p) { const c = 1.6; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); }
 
-let skyGrad = null, skyGradH = 0;
+// Night sky: pure black with the real bright stars (Yale Bright Star Catalog, public/data/sky.json).
+// Star colours come from each star's measured B-V colour index, so most read blue-white and a few
+// giants read orange or red. The sky is a wrapped panorama that drifts slowly with the camera.
+let skyGrad = null, skyGradH = 0; // kept: renderIslandSnapshot saves and restores these
+let SKY = null;
+const SKY_W = 3400, SKY_H = 1700, SKY_PARALLAX = 0.012;
+fetch('data/sky.json').then(r => r.ok ? r.json() : null).then(d => {
+  if (!d) return;
+  SKY = {
+    stars: d.stars.map(([ra, dec, mag, col]) => ({ x: (ra + 180) / 360 * SKY_W, y: (90 - dec) / 180 * SKY_H, mag, col,
+      r: Math.max(0.7, (6.3 - mag) * 0.55), a: Math.min(1, Math.max(0.45, (6.8 - mag) / 4.5)) })),
+    lines: d.lines.map(c => c.l.map(seg => seg.map(([ra, dec]) => [(ra + 180) / 360 * SKY_W, (90 - dec) / 180 * SKY_H]))),
+  };
+}).catch(() => {});
+
 function drawNebula() {
-  if (!skyGrad || skyGradH !== canvas.height) {
-    skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    skyGrad.addColorStop(0, COZY.skyTop);
-    skyGrad.addColorStop(0.6, COZY.skyMid);
-    skyGrad.addColorStop(1, COZY.skyLow);
-    skyGradH = canvas.height;
-  }
-  ctx.fillStyle = skyGrad;
+  ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
+function skyOffset() {
+  const ox = ((camera.x * SKY_PARALLAX) % SKY_W + SKY_W) % SKY_W;
+  const oy = ((camera.y * SKY_PARALLAX) % SKY_H + SKY_H) % SKY_H;
+  return [ox, oy];
+}
+const wrap = (v, m) => ((v % m) + m) % m;
+
 function drawStars() {
-  const layers = [{ speed: 0.015, size: 0.7, alpha: 0.35 }, { speed: 0.04, size: 1.1, alpha: 0.6 }];
-  ctx.fillStyle = COZY.star;
-  for (let li = 0; li < layers.length; li++) {
-    const layer = layers[li];
-    const start = Math.floor(li * (stars.length / 4)), end = Math.floor((li + 1) * (stars.length / 4));
-    for (let si = start; si < end; si++) {
-      const s = stars[si];
-      let sx = ((s.x * canvas.width * 2) - camera.x * layer.speed * s.r) % canvas.width; if (sx < 0) sx += canvas.width;
-      let sy = ((s.y * canvas.height * 2) - camera.y * layer.speed * s.r) % canvas.height; if (sy < 0) sy += canvas.height;
-      ctx.globalAlpha = (0.5 + s.brightness * 0.5) * layer.alpha;
-      const d = s.r * layer.size * 1.6;
-      ctx.fillRect(sx, sy, d, d);
+  // Faint unresolved stars for depth (the procedural set from engine.js), drawn first and dim.
+  ctx.fillStyle = '#C9D6FF';
+  for (let i = 0; i < stars.length; i += 2) {
+    const s = stars[i];
+    let sx = ((s.x * canvas.width * 2) - camera.x * 0.008) % canvas.width; if (sx < 0) sx += canvas.width;
+    let sy = ((s.y * canvas.height * 2) - camera.y * 0.008) % canvas.height; if (sy < 0) sy += canvas.height;
+    ctx.globalAlpha = 0.12 + s.brightness * 0.12;
+    ctx.fillRect(sx, sy, 1, 1);
+  }
+  ctx.globalAlpha = 1;
+  if (!SKY) return;
+  const [ox, oy] = skyOffset();
+  const W = canvas.width, H = canvas.height;
+
+  // Constellation lines, very faint, so the patterns are there when you look for them.
+  ctx.strokeStyle = 'rgba(170, 190, 255, 0.11)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (const c of SKY.lines) for (const seg of c) {
+    for (let i = 1; i < seg.length; i++) {
+      const x1 = wrap(seg[i - 1][0] - ox, SKY_W), y1 = wrap(seg[i - 1][1] - oy, SKY_H);
+      const x2 = wrap(seg[i][0] - ox, SKY_W), y2 = wrap(seg[i][1] - oy, SKY_H);
+      if (Math.abs(x1 - x2) > SKY_W / 2 || Math.abs(y1 - y2) > SKY_H / 2) continue; // crosses the wrap seam
+      if ((x1 > W && x2 > W) || (y1 > H && y2 > H)) continue;
+      ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
     }
+  }
+  ctx.stroke();
+
+  const t = performance.now() * 0.001;
+  for (let i = 0; i < SKY.stars.length; i++) {
+    const s = SKY.stars[i];
+    const sx = wrap(s.x - ox, SKY_W), sy = wrap(s.y - oy, SKY_H);
+    if (sx > W + 4 || sy > H + 4) continue;
+    // Only the brightest stars scintillate, and only slightly.
+    const tw = s.mag < 1.8 && !reduceMotion ? 0.88 + 0.12 * Math.sin(t * 1.7 + i) : 1;
+    ctx.fillStyle = s.col;
+    if (s.r < 1.3) { ctx.globalAlpha = s.a * tw; ctx.fillRect(sx, sy, s.r * 1.4, s.r * 1.4); continue; }
+    ctx.globalAlpha = 0.12 * tw;
+    ctx.beginPath(); ctx.arc(sx, sy, s.r * 2.6, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = s.a * tw;
+    ctx.beginPath(); ctx.arc(sx, sy, s.r, 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
@@ -204,7 +247,7 @@ function drawBuilding(b, scx, scy, grow = 1) {
 
   if (!b._wall) {
     const base = b.isFork ? '#9A93B5' : b.color;
-    b._wall = mixHex(base, COZY.cream, 0.55);
+    b._wall = mixHex(base, '#B8AE9E', 0.5); // dimmer walls at night so lit windows carry the light
     b._side = shadeRgb(b._wall, 0.78);
     b._roof = mixHex(base, '#3A2E55', 0.25);
     b._roofSide = shadeRgb(b._roof, 0.75);
@@ -246,7 +289,7 @@ function drawBuilding(b, scx, scy, grow = 1) {
     }
   }
 
-  if (z > 0.5 && !b.isFork && bw > 8) {
+  if (z > 0.3 && !b.isFork && bw > 6) {
     ctx.fillStyle = COZY.window;
     const ws = Math.max(2, 3.2 * z), gap = 7 * z;
     const rows = Math.max(1, Math.floor((wallH - (pitched ? wallH * 0.5 : 6 * z)) / gap));
@@ -344,7 +387,7 @@ function drawMinimap() {
   mapRect = { x, y, size, scale };
 
   // See-through so the live world stays visible behind the map.
-  ctx.fillStyle = `rgba(46,40,82,${0.9 - 0.32 * mapT})`; roundRect(x, y, size, size, 16); ctx.fill();
+  ctx.fillStyle = `rgba(14,14,20,${0.9 - 0.3 * mapT})`; roundRect(x, y, size, size, 16); ctx.fill();
   ctx.strokeStyle = `rgba(255,244,230,${0.25 * mapT})`; ctx.lineWidth = 1; roundRect(x, y, size, size, 16); ctx.stroke();
   ctx.save(); roundRect(x, y, size, size, 16); ctx.clip();
   const cxm = x + size / 2, cym = y + size / 2;
@@ -503,11 +546,12 @@ function checkProximity() {
 
 // Live picture of someone's island for the postcard. Draws with the same renderer into an offscreen canvas.
 // target: a login on the map, or an island object from buildIsland. opts.sky = false gives a transparent background.
+// opts.born (a performance.now() time) draws the buildings mid rise-in; opts.canvas reuses a canvas.
 window.renderIslandSnapshot = function (target, width, height, opts = {}) {
   const island = typeof target === 'string' ? islands.find(i => i.login === target) : target;
   if (!island) return null;
   if (!island._rim) prepareIsland(island);
-  const off = document.createElement('canvas');
+  const off = opts.canvas || document.createElement('canvas'); // opts.canvas: redraw in place (front-page rise-in)
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   off.width = Math.round(width * dpr); off.height = Math.round(height * dpr);
   const saved = { canvas, ctx, cam: { ...camera }, born: island._born, labels: window.drawnLabels, sky: skyGrad, skyH: skyGradH };
@@ -516,7 +560,7 @@ window.renderIslandSnapshot = function (target, width, height, opts = {}) {
   const fit = Math.min(off.width, off.height) / (island.islandRadius * (opts.fit || 3.1));
   window.__snapshotNoSign = opts.sign === false;
   camera.x = island.cx; camera.y = island.cy + island.islandRadius * 0.28; camera.zoom = fit;
-  island._born = -1e9; // fully grown, no rise-in
+  island._born = opts.born ?? -1e9; // fully grown unless the caller animates a rise-in
   window.drawnLabels = [];
   try {
     if (opts.sky !== false) { drawNebula(); drawStars(); }
@@ -546,6 +590,6 @@ function drawArrival() {
   const inOut = Math.min(1, t / 0.35, (total - t) / 0.45);
   const e = reduceMotion ? (inOut > 0 ? 1 : 0) : 1 - Math.pow(1 - Math.max(0, inOut), 3);
   const bar = canvas.height * 0.08 * e;
-  ctx.fillStyle = '#16132B';
+  ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, canvas.width, bar); ctx.fillRect(0, canvas.height - bar, canvas.width, bar);
 }

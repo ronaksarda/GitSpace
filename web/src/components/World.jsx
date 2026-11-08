@@ -5,6 +5,7 @@ import { t } from '../theme.js';
 import { animate, createTimeline, reduced, stagger } from '../motion.js';
 import { avatarUrl, fmt, plural, shipScreenPos } from '../lib.js';
 import SearchBox from './SearchBox.jsx';
+import { Brand } from './common.jsx';
 
 const Icon = ({ d, size = 18 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{d}</svg>
@@ -27,7 +28,7 @@ export const TopBar = forwardRef(function TopBar({ user, guest, onPick, onMenu }
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1100, height: 56, px: { xs: 1.5, sm: 2.5 },
       display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 }, bgcolor: t.surface, borderBottom: `1px solid ${t.line}`,
     }}>
-      <Box sx={{ fontWeight: 700, fontSize: 16, letterSpacing: '-0.01em', flex: { sm: '0 0 180px' }, display: { xs: narrow ? 'none' : 'block' } }}>GitSpace</Box>
+      <Box sx={{ flex: { sm: '0 0 180px' }, display: { xs: narrow ? 'none' : 'block' } }}><Brand /></Box>
       <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center', minWidth: 0 }}>
         <SearchBox ref={searchRef} onPick={onPick} />
       </Box>
