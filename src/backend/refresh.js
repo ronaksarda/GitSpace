@@ -1,17 +1,17 @@
 // Daily island refresh that does not depend on anyone signing in.
-// Every 10 minutes it takes the islands refreshed longest ago, re-reads their public repos from GitHub,
-// and rebuilds them in place. Unchanged accounts answer 304 to the ETag check, which costs no quota.
+// Four times a day (every 6 hours) it re-reads the public repos of every island not refreshed in the last
+// 5 hours and rebuilds them in place. Unchanged accounts answer 304 to the ETag check, which costs no quota.
 //
 // GITHUB_TOKEN (a read-only personal access token) raises the GitHub budget from 60 to 5,000 requests
-// an hour. Without it the refresh still runs, just a few islands per tick.
+// an hour. Without it each run only covers about 18 islands; the rest go first in the next run.
 // REFRESH_DISABLED=true turns it off (it is also off in sandbox mode unless REFRESH_IN_SANDBOX=true).
 
-const TICK_MS = 10 * 60 * 1000;
-const STALE_HOURS = 20;
+const TICK_MS = 6 * 60 * 60 * 1000; // 4 runs a day
+const STALE_HOURS = 5;
 
 function budgetPerTick() {
     // Up to 3 GitHub calls per island (pages of 100 repos). Keep well under the hourly limit.
-    return process.env.GITHUB_TOKEN ? 150 : 3;
+    return process.env.GITHUB_TOKEN ? 1500 : 18;
 }
 
 async function fetchRepos(login, etag) {
@@ -76,7 +76,7 @@ function start(db, router) {
     if (process.env.REFRESH_DISABLED === 'true') return;
     if (db.isSandbox() && process.env.REFRESH_IN_SANDBOX !== 'true') return;
     const run = () => tick(db, router).catch(e => console.warn('[Refresh] tick failed:', e.message));
-    setTimeout(run, 60 * 1000).unref(); // first run a minute after boot
+    setTimeout(run, 2 * 60 * 1000).unref(); // first run two minutes after boot, then every 6 hours
     setInterval(run, TICK_MS).unref();
 }
 
