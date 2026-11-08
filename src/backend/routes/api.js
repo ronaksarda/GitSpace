@@ -448,7 +448,8 @@ module.exports = function (db, heavyLimiter) {
     router.get('/api/stats', async (req, res) => {
         try {
             const stats = await db.getStats();
-            res.json(stats);
+            // Required here, not at the top: tests load this router without a database.
+            res.json({ ...stats, prsMerged: await require('../missionsStore').countMerged().catch(() => 0) });
         } catch (err) {
             res.status(500).json({ error: 'Failed to fetch stats' });
         }

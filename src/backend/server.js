@@ -104,6 +104,9 @@ app.use('/api', apiLimiter);
 app.use('/', require('./routes/auth')(db, CLIENT_ID, CLIENT_SECRET, CALLBACK_URL));
 const apiRouter = require('./routes/api')(db, heavyLimiter);
 app.use('/', apiRouter);
+const missionsStore = require('./missionsStore');
+const missionsRoutes = require('./routes/missions');
+app.use('/', missionsRoutes({ db, store: missionsStore, getLogin: missionsRoutes.sessionLogin(db) }));
 
 // 404 fallback
 app.use((req, res) => {
@@ -132,6 +135,8 @@ process.on('unhandledRejection', (reason, promise) => {
 
 (async () => {
     await db.initDb();
+    await missionsStore.ensureSchema().catch(e => console.error('[DB] missions tables not ready:', e.message)); // the map must still start
+    require('./missions').start(db, missionsStore); // issue pool every 6 hours, PR checks every hour
     require('./refresh').start(db, apiRouter); // daily island refresh, independent of sign-ins
     app.listen(PORT, () => {
         console.log(`GitSpace server running at ${APP_URL} (Port: ${PORT})`);
