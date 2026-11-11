@@ -179,7 +179,6 @@ web/src/           React UI source (components/, theme, motion, postcard rendere
 src/backend/       Express server, routes, database, refresh, missions, health checks
 src/engine/        C++17 layout engine
 test/              node --test suites
-docs/              plans and build notes
 ```
 
 ## Scripts

@@ -37,3 +37,6 @@ lerna-debug.log*
 Thumbs.db
 src/backend/scripts/seed_sandbox.js
 public/app/
+
+# Private notes
+docs/

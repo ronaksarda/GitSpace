@@ -32,7 +32,6 @@ The [README](README.md#run-it-locally) has the full setup, including OAuth and t
 | `src/engine/` | C++17 island layout engine (a JavaScript fallback gives the same layout) |
 | `web/src/` | React 19 + MUI UI and the Canvas 2D world |
 | `test/` | Tests, run with Node's built-in test runner |
-| `docs/` | Design notes and plans |
 
 ## Make your change
 
