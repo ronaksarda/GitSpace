@@ -1,191 +1,222 @@
 <div align="center">
-  <img src="public/logo.png" alt="GitSpace Logo" width="200"/>
-  <h1>🌌 GitSpace: The GitHub Universe 🚀</h1>
-  <p><strong>Your GitHub repositories are a world. Every repo is a building. Every developer is an island.</strong></p>
-  <h3>🌐 Play Live: <a href="https://gitspace.me">https://gitspace.me</a></h3>
+
+<img src="public/logo.svg" alt="GitSpace" width="120"/>
+
+# GitSpace
+
+### Every GitHub account is an island. Every repo is a building. Fly to anyone.
+
+**[Play it live at gitspace.me](https://gitspace.me)** · [Run it locally](#run-it-locally) · [How it works](#how-it-works) · [Your first open-source PR](#your-first-open-source-pr)
+
+![Node](https://img.shields.io/badge/node-%E2%89%A522.12-3c873a)
+![Express](https://img.shields.io/badge/backend-Express-black)
+![React](https://img.shields.io/badge/UI-React%2019%20%2B%20MUI-149eca)
+![Canvas](https://img.shields.io/badge/world-Canvas%202D-orange)
+![C++17](https://img.shields.io/badge/layout-C%2B%2B17%20%2B%20JS%20fallback-00599c)
+![Postgres](https://img.shields.io/badge/db-Postgres%20or%20sandbox-336791)
+
+<img src="readme_demo.gif" alt="Flying across GitSpace islands" width="820"/>
+
 </div>
 
-Welcome to **GitSpace**—a gamified, massive 2D universe that transforms the world of open-source into a sprawling, explorable galaxy. Say goodbye to scrolling through endless lists of repositories. Instead, strap into your ship, fire up the warp drive, and physically *fly* through the open-source ecosystem. 
-Whether you're visiting your own island or discovering new citizens of the galaxy, GitSpace makes exploring code a beautiful, immersive adventure!
-
-
-![GitSpace demo](./readme_demo.gif)
-
-
 ---
 
-## 🎮 The Experience
+A GitHub profile is a list. GitSpace turns it into a place.
 
-- **🚀 Pilot Your Ship**: Use `WASD` or `Arrow Keys` to fly your personal spacecraft through deep space. Leave glowing engine trails as you navigate the cosmos.
-- **🏝️ Developer Islands**: Every GitHub user gets their own procedurally generated island. Watch as the "terrain" reflects their primary coding language.
-- **🏙️ Repository Cities**: Your repositories are transformed into isometric buildings. A small side-project might be a humble hut, while a massive 10k+ star repository becomes a towering, flashing skyscraper emitting a golden aura!
-- **⚡ Slipstream Warp Drive**: Found an interesting developer in the Citizens Directory? Engage the autopilot warp drive and watch the stars streak past you as you seamlessly travel thousands of lightyears to their island.
-- **🏆 Unlock Achievements**: Play while you explore! Unlock achievements like *"Space Marathon"* (traveling 100k units), *"The Architect"* (inspecting 10 repos), or *"The Polyglot"* (mastering 4+ languages).
-- **🔥 Heatmap Rings & Activity**: Islands actually *pulse* with energy if the developer is active, and individual repositories glow based on how recently they were updated.
+Sign in, and your public repos rise out of the sea as an island city. Small side projects are huts. Repos with thousands of stars are towers that glow. Then search any developer, hit warp, and fly across the map to see what they have built.
 
-## 🚩 Your First Open-Source PR
+When you are ready, GitSpace also hands you a beginner issue in a language you already write, watches for your pull request, and counts it once it is merged. Your first open-source PR, with a map to get there.
 
-Press **First PR** in the top bar (sign in with GitHub first).
+## What you can do
 
-- **For you**: beginner issues ("good first issue", "beginner") in the languages your island is built from, newest first. Only active, real projects make the list: 50 to 50,000 stars, pushed in the last 30 days, not a fork or template. **Refresh** fetches fresh ones from GitHub on the spot.
-- **I'm on it**: takes the issue as a mission (2 at a time). GitSpace checks GitHub first, so you never take an issue someone else was just assigned, and at most 2 GitSpace people work on one issue.
-- **Merged counts**: every hour GitSpace looks for your PR. It counts only if it is yours, in that repo, says `Fixes #N` (or links the issue) and is merged after you took the mission. A PR closed without merging puts the mission back to "working on it". If the issue is closed or given to someone else, the mission ends; 45 days with no PR, it expires.
-- **Your contributions**: after your first merge, a dashboard of every PR you got merged into other people's projects: PRs, projects, commits, merges per month, and links. **For you** then also offers issues in projects that already merged your work.
-- The top bar button turns into your merged count.
+| | |
+| --- | --- |
+| **Get an island** | Sign in with GitHub. Each public repo becomes a building. Stars make it taller, size makes it wider, and your languages shape the land. |
+| **Fly anywhere** | Pilot your ship with `WASD` or the arrow keys. Search a developer or a repo and the autopilot warps you there. |
+| **Read any repo** | Click a building to read its README and run a **health check**: a graded report (A+ to F) on activity, docs, license, issues and more, with concrete fixes. |
+| **Share your island** | Download a postcard PNG of your island, or copy a link that flies people straight to it. |
+| **Watch it grow** | Islands refresh by themselves four times a day. New repos show up as new buildings, and active islands pulse. |
+| **Land your first PR** | Press **First PR** for beginner issues picked for you. See below. |
 
----
+## Your first open-source PR
 
-## 🛠️ Tech Stack
+Press **First PR** in the top bar (sign in first).
 
-Beneath the fun exterior lies a highly optimized, custom-built engine:
+1. **For you** lists beginner issues ("good first issue", "beginner") in the languages your island is built from, newest first. Only real, active projects qualify: 50 to 50,000 stars, pushed in the last 30 days, not a fork or a template. **Refresh** pulls fresh ones from GitHub on the spot.
+2. **I'm on it** takes an issue as a mission. You can hold 2 at a time. GitSpace checks GitHub first, so you never take an issue that was just assigned to someone else, and at most 2 GitSpace users work on one issue.
+3. **Merged counts.** Every hour GitSpace looks for your PR. It counts only when it is yours, in that repo, links the issue (`Fixes #N` or a linked issue), and is merged after you took the mission.
+   - PR closed without merging: the mission goes back to "working on it".
+   - Issue closed or given to someone else: the mission ends.
+   - 45 days with no PR: the mission expires.
+4. **Your contributions** appears after your first merge: every PR you got merged into other people's projects, with projects, commits, merges per month and links. **For you** then also suggests issues in projects that already merged your work.
 
-- **Frontend**: Vanilla JavaScript & HTML5 Canvas API (No heavy WebGL frameworks—pure, raw 60FPS 2D rendering!)
-- **Backend Framework**: Express.js (Node.js)
-- **Spatial Engine**: Optional C++17 native accelerator for lightning-fast coordinate math (with a seamless, deterministic JavaScript fallback)
-- **Database**: PostgreSQL (with a seamless local JSON Sandbox mode fallback)
-- **Deployment**: Render (via Nixpacks)
+The **First PR** button turns into your merged count.
 
----
+## Run it locally
 
-## 🏁 Getting Started
-
-Ready to launch your own local instance of the GitSpace universe?
-
-### 1. Clone the Repository
+You need Node.js 22.12 or newer. A C++17 compiler and Postgres are optional.
 
 ```bash
 git clone https://github.com/ronaksarda/GitSpace.git
-cd GitSpace
 ```
 
-### 2. Install Dependencies
+```bash
+cd GitSpace
+```
 
 ```bash
 npm install
 ```
 
-### 3. Compile the Spatial Engine
-
-GitSpace relies on a blazing-fast custom C++ engine to handle the math of placing thousands of buildings without overlapping.
-
-```bash
-# Using Make (Linux/macOS)
-cd src/engine
-make
-cd ../..
-
-# Or manually compile it (Windows/Linux/macOS)
-g++ -O2 -std=c++17 -o src/engine/gitspace_engine src/engine/main.cpp   # add .exe on Windows
-
-# Or: npm run build (same command, falls back to the JS engine if g++ is missing)
-```
-
-### 4. Environment Setup
-
-Copy the example environment file:
+`npm install` also builds the React UI into `public/app/`.
 
 ```bash
 cp .env.example .env
 ```
 
-Configure your `.env` variables:
-
-| Variable | Description | Example |
-| --- | --- | --- |
-| `GITHUB_CLIENT_ID` | Your GitHub OAuth App Client ID | `Iv1.abc...` |
-| `GITHUB_CLIENT_SECRET` | Your GitHub OAuth App Client Secret | `abc123def...` |
-| `SESSION_SECRET` | Secret used to sign session cookies | `super_secret_string` |
-| `PORT` | The port the Node server runs on | `3000` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@localhost:5432/gitspace` |
-| `APP_URL` | The callback base URL | `http://localhost:3000` |
-| `GITHUB_TOKEN` | Optional, read-only. Lets the 6-hourly issue refresh and island refresh cover far more repos (5,000 GitHub requests an hour instead of 60) | `github_pat_...` |
-| `MISSIONS_DISABLED` | Optional. `true` turns off the background issue refresh and PR checks | `true` |
-
-*💡 Tip: Don't want to set up Postgres right now? Set `DATABASE_URL=sandbox` to use the built-in local JSON database for instant development!*
-
-### 5. Start the Universe
-
-Ignite the thrusters and start the Express server:
+The example file uses `DATABASE_URL=sandbox`, a local JSON database. No Postgres needed.
 
 ```bash
 npm start
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and prepare for liftoff!
+Open [http://localhost:3000](http://localhost:3000).
 
----
+### Sign in locally
 
-## 🧠 How It Works: Deep Dive Architecture
+Create a GitHub OAuth App at [github.com/settings/developers](https://github.com/settings/developers):
 
-For the curious engineers, here is exactly how we generate a galaxy from code.
+- **Homepage URL:** `http://localhost:3000`
+- **Authorization callback URL:** `http://localhost:3000/auth/callback`
 
-### 1. The Spatial Layout Engine (`src/engine/` & `api.js`)
+Put its client ID and secret in `.env`.
 
-The core of GitSpace's backend performance relies on an iterative outward spiral algorithm to organically pack repositories together without overlapping. By default, this runs as a deterministic JavaScript algorithm. However, for extreme performance on large deployments, it can be accelerated using an optional custom C++17 engine.
+To skip OAuth while you develop, set `NODE_ENV=development` and `MOCK_USER_LOGIN=<a GitHub username>`. Mock login is refused in production.
 
-- **Dynamic Quadtree Partitioning**: A `Quadtree` covering the area around the island centre makes searching for neighbors fast.
-- **Spiral Collision Resolution**: When calculating where to place a building on a user's island, the engine walks an outward spiral: each attempt turns a fixed 0.38197 radians and moves out to `0.8 * radius * sqrt(attempt)`, until the building no longer overlaps its neighbours (radius sum + 5 units gap). This packs repositories into natural-looking circular cities. The JavaScript fallback in `api.js` runs the exact same algorithm, so both give identical layouts.
-- **Landmass Footprint Calculation**: Repositories are categorized dynamically based on their language. For example, `C++` and `Rust` are treated as `FrameworkNode` types, giving them a larger fundamental base radius footprint. The footprint scales non-linearly with the repository's stars (`sqrt(stars)`) and size (`sqrt(size)`).
+### Optional: the native layout engine
 
-### 2. The Node.js Express Backend (`src/backend/`)
+The layout engine runs in JavaScript by default. A C++17 build gives the same layout, faster:
 
-The Node.js backend serves as the API layer, database orchestrator, and OAuth handler.
-
-- **Sandbox vs. Production Mode**: The database module seamlessly wraps PostgreSQL and a fallback local JSON file (`sandbox_db.json`). In sandbox mode, it utilizes a custom in-memory Trie data structure for instantaneous O(L) prefix queries when searching for users/repos globally.
-- **Token Encryption**: Session tokens from GitHub OAuth are securely encrypted using `aes-256-gcm` before entering the database.
-- **The Spawning Algorithm**: When a new user logs in, `findFreeSpot` initiates an outward radial search from coordinate `(0, 0)` in `1000` unit increments at `45-degree` angles until it finds a clear `2000` unit radius of empty space to construct their new island territory.
-- **Dynamic Chunking**: The frontend requests data based on its viewport `(minX, minY, maxX, maxY)`. The backend buffers this by `600` units to pre-load adjacent islands, ensuring smooth scrolling without elements "popping" into existence.
-
-### 3. The HTML5 Canvas Rendering Engine (`public/js/`)
-
-The frontend doesn't use WebGL; it relies on a highly-optimized Vanilla JavaScript Canvas 2D engine that can handle thousands of entities.
-
-- **Isometric Projections**: Repositories are drawn from back-to-front by pre-sorting their `Y` coordinates. They use 2D canvas pathing with varying height logic based on tiers (`hut`, `house`, `tower`, `skyscraper`), dynamically calculated by combining stars and file size.
-- **Slipstream Warp Drive**: When auto-piloting to another developer's island via the Citizens menu, the engine calculates the distance vector. If it's a long journey, the `warpActive` state engages. This triggers a `screen` compositing operation, drawing hyper-speed particle streaks across the viewport while temporarily suppressing the rendering of small objects to maintain a buttery smooth 60 FPS.
-- **Parallax Backgrounds**: Deep space is comprised of three depth-sorted layers of twinkling stars and multiple overlapping radial gradient nebulae that offset at slower fractional speeds relative to the camera position without any flickering.
-
-### Data Flow Overview
-
-```text
-User Action (Browser Canvas) 
-  → Interpolated camera coordinates sent to Express API 
-    → PostgreSQL fetches User/Repo chunks in bounding box 
-      → C++ Engine calculates collision-free repo footprints 
-        → Node.js serializes back to JSON 
-          → Canvas Engine renders isometric world
+```bash
+npm run build
 ```
 
----
+`npm run build` compiles `src/engine/main.cpp` when `g++` is installed, then builds the UI. Without `g++` it skips the engine and keeps the JavaScript version. A parity test (`test/engine-parity.test.js`) keeps the two identical.
 
-## 📜 Available Scripts
+## Configuration
 
-| Command | Description |
+| Variable | Required | What it does |
+| --- | --- | --- |
+| `GITHUB_CLIENT_ID` | for sign-in | GitHub OAuth App client ID |
+| `GITHUB_CLIENT_SECRET` | for sign-in | GitHub OAuth App client secret |
+| `SESSION_SECRET` | yes | Signs session cookies. Use a long random string |
+| `APP_URL` | yes | Base URL for the OAuth callback, e.g. `http://localhost:3000` |
+| `PORT` | no | Server port. Default `3000` |
+| `DATABASE_URL` | yes | Postgres connection string, or `sandbox` for the local JSON database |
+| `DATABASE_SSL_CA` | no | Path to a CA certificate. Turns on verified TLS to Postgres |
+| `USE_SANDBOX` | no | `true` forces sandbox mode |
+| `SANDBOX_DB_FILE` | no | Where the sandbox database lives. Default `src/backend/sandbox_db.json` |
+| `GITHUB_TOKEN` | no | Read-only token. Raises the GitHub budget from 60 to 5,000 requests an hour, so background refreshes cover far more islands and issues |
+| `REFRESH_DISABLED` | no | `true` stops the 6-hourly island refresh |
+| `MISSIONS_DISABLED` | no | `true` stops the issue refresh and PR checks |
+| `REFRESH_IN_SANDBOX`, `MISSIONS_IN_SANDBOX` | no | `true` runs those background jobs in sandbox mode too (off by default) |
+| `NODE_ENV` | no | `development` allows mock login |
+| `MOCK_USER_LOGIN` | no | GitHub username for mock login |
+
+## How it works
+
+```text
+Browser                                   Server (Express)                      GitHub
+───────                                   ────────────────                      ──────
+Canvas world (public/js) ── viewport ──▶  /api/chunk: islands in the box + 600
+React UI (web/src)       ◀── JSON ─────   layout engine (C++ or JS) places repos
+                                          Postgres / sandbox JSON
+Sign in ─────────────────────────────▶   /auth/github ─────────────────────▶ OAuth
+                                          every 6 h: refresh islands, issues ─▶ REST API
+                                          every 1 h: check mission PRs ───────▶ REST API
+```
+
+### The world
+
+The world is a plain Canvas 2D engine in `public/js/` (no WebGL). It draws repos back to front for an isometric look, in four tiers (`hut`, `house`, `tower`, `skyscraper`) set by stars and size. Space has three parallax star layers and soft nebulae. During a long warp, the engine draws speed streaks and skips small objects to hold 60 FPS.
+
+The interface on top (search, cards, dialogs, health reports, missions, the front page) is React 19 with MUI, built by Vite from `web/src/` into `public/app/`.
+
+### Island layout
+
+Each repo needs a spot on its island that does not overlap its neighbours. The engine walks an outward spiral: each try turns 0.38197 radians and moves out to `0.8 × radius × √attempt`, until the building clears every neighbour by the sum of their radii plus 5 units. A quadtree keeps the neighbour checks fast. Footprints grow with `√stars` and `√size`, and systems languages such as C++ and Rust get a larger base.
+
+The same algorithm exists in C++ (`src/engine/`) and JavaScript, and they produce identical layouts.
+
+### Placing new developers
+
+When someone new signs in, `findFreeSpot` searches outward from `(0, 0)` in 1,000-unit rings at 45° steps until it finds 2,000 units of empty space for the new island.
+
+### Loading the map
+
+The client asks only for what is on screen: `/api/chunk` takes the viewport box, and the server pads it by 600 units so neighbouring islands are ready before you reach them.
+
+### Data and security
+
+- **Postgres in production, JSON in development.** The database module wraps both. Sandbox mode searches users and repos with an in-memory trie.
+- **Tokens are encrypted** with `aes-256-gcm` before they are stored.
+- **Read-only.** GitSpace reads public repos and your profile. It never posts anything for you.
+- Heavy endpoints are rate limited, and READMEs are sanitized with DOMPurify before they render.
+
+### Background jobs
+
+| Job | How often | What it does |
+| --- | --- | --- |
+| Island refresh | every 6 hours | Rebuilds islands not refreshed in 5 hours. Unchanged accounts answer `304` to the ETag check and cost no quota |
+| Issue refresh | every 6 hours | Collects fresh beginner issues for **For you** |
+| Mission check | every hour | Looks for merged PRs on active missions |
+
+## Project layout
+
+```text
+public/            static site: index.html, the Canvas engine (js/), built UI (app/)
+web/src/           React UI source (components/, theme, motion, postcard renderer)
+src/backend/       Express server, routes, database, refresh, missions, health checks
+src/engine/        C++17 layout engine
+test/              node --test suites
+docs/              plans and build notes
+```
+
+## Scripts
+
+| Command | What it does |
 | --- | --- |
-| `npm start` | Start the backend Express server |
+| `npm start` | Start the server |
 | `npm test` | Run the tests (`node --test`) |
-| `npm run build` | Build the C++ engine (if `g++` is there) and the React bundle |
-| `npm run build:web` | Build only the React bundle into `public/app/` |
-| `npm run dev:web` | Rebuild the React bundle on every change |
-| `npm run seed:stress` | Stress test database seeding |
-| `npm run compact` | Pack existing islands closer together (`-- --apply` to write) |
+| `npm run build` | Build the C++ engine (if `g++` exists) and the UI |
+| `npm run build:web` | Build only the UI into `public/app/` |
+| `npm run dev:web` | Rebuild the UI on every change |
+| `npm run seed:stress` | Fill the database with many fake islands for load testing |
+| `npm run compact` | Dry run: show how existing islands would pack closer together. Add `-- --apply` to write it (a backup JSON is saved first) |
 
-## 🧰 Troubleshooting
+## Deploy
 
-### C++ Engine Build Failures
-**Error:** `g++: command not found`
-**Solution:** Ensure you have GCC installed.
-- **Ubuntu/Debian**: `sudo apt install build-essential`
-- **macOS**: `xcode-select --install`
-- **Windows**: Install MinGW or use WSL.
+GitSpace is a single Node process, so any host that runs `npm start` works. Live, it runs on Render with Postgres.
 
-### Database Connection Issues
-**Error:** `Could not connect to database` or `relation "users" does not exist`
-**Solution:**
-1. Verify PostgreSQL is running.
-2. Check your `DATABASE_URL` connection string.
-3. Use the fallback mode by setting `DATABASE_URL=sandbox` in your `.env` to test without a database.
+1. Set the variables from [Configuration](#configuration). Use a real Postgres `DATABASE_URL`, and set `APP_URL` to your public URL.
+2. Point your GitHub OAuth App callback at `<APP_URL>/auth/callback`.
+3. Build with `npm install` (add the `g++` line from `railway.json` if you want the native engine). Start with `npm start`.
+4. Use `/health` as the health check.
 
-### OAuth Redirect URI Mismatch
-**Error:** `redirect_uri_mismatch` from GitHub.
-**Solution:** Ensure the `Authorization callback URL` in your GitHub OAuth App settings matches your `APP_URL` + `/auth/callback` (e.g., `http://localhost:3000/auth/callback`).
+`railway.json` and `nixpacks.toml` are ready for Nixpacks-based hosts such as Railway.
 
+## Troubleshooting
+
+**`redirect_uri_mismatch` from GitHub.** The OAuth App callback URL must be exactly `APP_URL` + `/auth/callback`.
+
+**`relation "users" does not exist` or no database connection.** Check that Postgres is running and `DATABASE_URL` is right. To work without Postgres, set `DATABASE_URL=sandbox`.
+
+**`g++: command not found`.** Nothing breaks: the JavaScript engine takes over. For the native engine, install a compiler: `sudo apt install build-essential` (Ubuntu/Debian), `xcode-select --install` (macOS), or MinGW or WSL (Windows).
+
+**Islands or issues refresh slowly.** Without `GITHUB_TOKEN` the server has 60 GitHub requests an hour. Add a read-only token.
+
+## Contributing
+
+Issues and pull requests are welcome. Run `npm test` before you open a PR.
+
+Fitting, for a project that helps people land their first one.
