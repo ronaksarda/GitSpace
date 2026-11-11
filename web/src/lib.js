@@ -63,6 +63,8 @@ export function islandLanguages(buildings, max = 3) {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, max)
     .map(([lang, n]) => ({ lang, n, pct: Math.round(n / total * 100) }));
 }
-export const topRepos = (buildings, n) => [...(buildings || [])].sort((a, b) => (b.stars || 0) - (a.stars || 0)).slice(0, n);
+// The owner's GitHub pinned repos come first, in their pinned order; then the most starred.
+export const topRepos = (buildings, n) => [...(buildings || [])]
+  .sort((a, b) => (a.pin ?? 99) - (b.pin ?? 99) || (b.stars || 0) - (a.stars || 0)).slice(0, n);
 
 export const toast = msg => window.showToast?.(msg);

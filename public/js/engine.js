@@ -111,7 +111,7 @@ function buildIsland(login, userData) {
     maxDist = MAX_SPREAD;
   }
   // Only the most-starred buildings carry a name label; labels for all of them cost too much per frame.
-  [...buildings].sort((a, b) => (b.stars || 0) - (a.stars || 0)).slice(0, 8).forEach(b => { b.showLabel = true; });
+  [...buildings].sort((a, b) => (a.pin ?? 99) - (b.pin ?? 99) || (b.stars || 0) - (a.stars || 0)).slice(0, 8).forEach(b => { b.showLabel = true; });
   const islandRadius = Math.max(120, maxDist + 90);
 
   const img = new Image();

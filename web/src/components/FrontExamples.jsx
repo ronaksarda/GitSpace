@@ -52,7 +52,7 @@ export function Compare({ dev }) {
       const other = island.buildings.find(b => b !== top && b.language !== top.language && b.language !== 'Other') || island.buildings.find(b => b !== top);
       // Chips sit in the empty sky (one above the island, one beside the keel) with a leader line to the roof.
       const out = [];
-      if (top) out.push({ ...buildingPoint(island, top, w, h, FIT), cx: Math.max(8, w / 2 - 90), cy: 8, text: `Most stars: ${top.name}` });
+      if (top) out.push({ ...buildingPoint(island, top, w, h, FIT), cx: Math.max(8, w / 2 - 90), cy: 8, text: `Top project: ${top.name}` });
       if (other) out.push({ ...buildingPoint(island, other, w, h, FIT), cx: Math.max(8, Math.min(w * 0.58, w - 200)), cy: h * 0.74, text: `Roof colour = ${other.language}` });
       setLabels(out);
     };

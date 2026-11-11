@@ -396,6 +396,7 @@ async function getChunks(minX, minY, maxX, maxY) {
                     avatar: u.avatar,
                     primaryLanguage: u.primary_language,
                     isActive: (now - (u.last_login || u.first_seen || 0)) < ONE_WEEK_MS,
+                    pinned: u.pinned || [],
                     buildings: []
                 };
             }
@@ -419,14 +420,14 @@ async function getChunks(minX, minY, maxX, maxY) {
             }
         }
 
-        return { users: userMap };
+        return { users: markPinned(userMap) };
     }
 
     const client = await pool.connect();
     try {
         const usersRes = await client.query(`
-            SELECT login, cx, cy, avatar, primary_language, first_seen, last_login 
-            FROM users 
+            SELECT login, cx, cy, avatar, primary_language, first_seen, last_login, pinned
+            FROM users
             WHERE cx >= $1 AND cx <= $2 AND cy >= $3 AND cy <= $4
             LIMIT 1000
         `, [qMinX, qMaxX, qMinY, qMaxY]);
@@ -445,6 +446,7 @@ async function getChunks(minX, minY, maxX, maxY) {
                 avatar: u.avatar,
                 primaryLanguage: u.primary_language,
                 isActive: (now - (u.last_login || u.first_seen || 0)) < ONE_WEEK_MS,
+                pinned: u.pinned || [],
                 buildings: []
             };
             logins.push(u.login);
@@ -474,10 +476,21 @@ async function getChunks(minX, minY, maxX, maxY) {
             }
         }
 
-        return { users: userMap };
+        return { users: markPinned(userMap) };
     } finally {
         client.release();
     }
+}
+
+// Each building gets pin = its place in the owner's GitHub pinned list, so "top repos" can follow the owner's own pick.
+function pinRepos(repos, pinned = []) {
+    const at = new Map(pinned.map((name, i) => [name.toLowerCase(), i]));
+    return repos.map(r => (at.has(r.name.toLowerCase()) ? { ...r, pin: at.get(r.name.toLowerCase()) } : r));
+}
+
+function markPinned(userMap) {
+    for (const u of Object.values(userMap)) { u.buildings = pinRepos(u.buildings, u.pinned); delete u.pinned; }
+    return userMap;
 }
 
 async function getUser(login) {
@@ -775,6 +788,7 @@ module.exports = {
     getChunks,
     getUser,
     getRepos,
+    pinRepos,
     updateLastLogin,
     getStats,
     getCitizens,

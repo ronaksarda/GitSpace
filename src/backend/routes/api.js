@@ -488,7 +488,7 @@ module.exports = function (db, heavyLimiter) {
                 cy: user.cy,
                 avatar: user.avatar,
                 primaryLanguage: user.primary_language,
-                repos: repos
+                repos: db.pinRepos(repos, user.pinned || [])
             });
         } catch (err) {
             console.error('[API] /api/user/:login error:', err.message);
